@@ -1,0 +1,1811 @@
+
+// Initial data structure based on the Excel file
+const initialStudents = [
+  { id: 1, firstName: 'Abanob', lastName: 'Bakheet', grade: '9th', phone: '951-429-2464', email: '', dob: '2010-08-05', responsibleServant: 'Mariam', status: 'Active' },
+  { id: 2, firstName: 'Abigail', lastName: 'Malak', grade: '10th', phone: '', email: '', dob: '', responsibleServant: 'Mariam', status: 'Active' },
+  { id: 3, firstName: 'Alexandra', lastName: 'Gerges', grade: '11th', phone: '', email: '', dob: '2008-08-22', responsibleServant: 'Mariam', status: 'Active' },
+  { id: 4, firstName: 'Andrew', lastName: 'Nabil', grade: '12th', phone: '', email: '', dob: '2009-07-28', responsibleServant: 'Nancy', status: 'Active' },
+  { id: 5, firstName: 'Angela', lastName: 'Moawad', grade: '9th', phone: '', email: '', dob: '2008-09-22', responsibleServant: 'Veronia', status: 'Active' },
+];
+
+const initialAttendance = [];
+
+const initialCourses = [
+  { id: 1, name: 'Dogma 1', category: 'Theology' },
+  { id: 2, name: 'Dogma 2', category: 'Theology' },
+  { id: 3, name: 'Spirituality', category: 'Spiritual Life' },
+  { id: 4, name: 'Liturgical Studies', category: 'Worship' },
+  { id: 5, name: 'Patristics', category: 'Church Fathers' },
+  { id: 6, name: 'Apologetics', category: 'Apologetics' },
+  { id: 7, name: 'New Testament', category: 'Scripture' },
+  { id: 8, name: 'Old Testament', category: 'Scripture' },
+  { id: 9, name: 'Church History', category: 'History' },
+  { id: 10, name: 'Comparative Religion', category: 'Comparative' },
+];
+
+const YouthMinistryApp = () => {
+  const [currentView, setCurrentView] = useState('dashboard');
+  const [students, setStudents] = useState(initialStudents);
+  const [attendance, setAttendance] = useState(initialAttendance);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterGrade, setFilterGrade] = useState('all');
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [serviceRotations, setServiceRotations] = useState([]);
+  const [visitations, setVisitations] = useState([]);
+  const [teachingSchedule, setTeachingSchedule] = useState([]);
+
+  // Calculate statistics
+  const stats = {
+    totalStudents: students.filter(s => s.status === 'Active').length,
+    totalGraduates: students.filter(s => s.status === 'Graduate').length,
+    averageAttendance: 0,
+    upcomingVisits: visitations.filter(v => !v.completed).length,
+  };
+
+  // Filter students
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGrade = filterGrade === 'all' || student.grade === filterGrade;
+    return matchesSearch && matchesGrade;
+  });
+
+  // Attendance marking
+  const markAttendance = (studentId, present) => {
+    const newRecord = {
+      id: Date.now(),
+      studentId,
+      date: attendanceDate,
+      present,
+      day: new Date(attendanceDate).toLocaleDateString('en-US', { weekday: 'short' })
+    };
+    setAttendance([...attendance, newRecord]);
+  };
+
+  // Student CRUD operations
+  const addStudent = (studentData) => {
+    setStudents([...students, { ...studentData, id: Date.now() }]);
+    setShowModal(false);
+  };
+
+  const updateStudent = (id, studentData) => {
+    setStudents(students.map(s => s.id === id ? { ...s, ...studentData } : s));
+    setShowModal(false);
+    setSelectedStudent(null);
+  };
+
+  const deleteStudent = (id) => {
+    if (confirm('Are you sure you want to delete this student?')) {
+      setStudents(students.filter(s => s.id !== id));
+    }
+  };
+
+  // Component: Dashboard
+  const Dashboard = () => (
+    <div className="dashboard-grid">
+      <div className="stat-card stat-primary">
+        <div className="stat-icon"><Users size={32} /></div>
+        <div className="stat-content">
+          <div className="stat-label">Active Students</div>
+          <div className="stat-value">{stats.totalStudents}</div>
+        </div>
+      </div>
+      
+      <div className="stat-card stat-secondary">
+        <div className="stat-icon"><Award size={32} /></div>
+        <div className="stat-content">
+          <div className="stat-label">Graduates</div>
+          <div className="stat-value">{stats.totalGraduates}</div>
+        </div>
+      </div>
+      
+      <div className="stat-card stat-accent">
+        <div className="stat-icon"><Activity size={32} /></div>
+        <div className="stat-content">
+          <div className="stat-label">Avg Attendance</div>
+          <div className="stat-value">78%</div>
+        </div>
+      </div>
+      
+      <div className="stat-card stat-warning">
+        <div className="stat-icon"><MapPin size={32} /></div>
+        <div className="stat-content">
+          <div className="stat-label">Pending Visits</div>
+          <div className="stat-value">{stats.upcomingVisits}</div>
+        </div>
+      </div>
+
+      <div className="dashboard-section recent-activity">
+        <h2>Recent Activity</h2>
+        <div className="activity-list">
+          <div className="activity-item">
+            <Clock size={16} />
+            <span>Attendance marked for Friday service</span>
+            <span className="activity-time">2 hours ago</span>
+          </div>
+          <div className="activity-item">
+            <Users size={16} />
+            <span>New student added: John Doe</span>
+            <span className="activity-time">1 day ago</span>
+          </div>
+          <div className="activity-item">
+            <MapPin size={16} />
+            <span>Visitation completed: Smith Family</span>
+            <span className="activity-time">2 days ago</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="dashboard-section quick-actions">
+        <h2>Quick Actions</h2>
+        <div className="action-buttons">
+          <button className="action-btn" onClick={() => setCurrentView('attendance')}>
+            <CheckSquare size={20} />
+            Mark Attendance
+          </button>
+          <button className="action-btn" onClick={() => { setShowModal(true); setSelectedStudent(null); }}>
+            <Plus size={20} />
+            Add Student
+          </button>
+          <button className="action-btn" onClick={() => setCurrentView('visitations')}>
+            <MapPin size={20} />
+            Schedule Visit
+          </button>
+          <button className="action-btn" onClick={() => setCurrentView('reports')}>
+            <Download size={20} />
+            Generate Report
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Component: Students Management
+  const StudentsView = () => (
+    <div className="content-section">
+      <div className="section-header">
+        <h1>Students Management</h1>
+        <button className="btn-primary" onClick={() => { setShowModal(true); setSelectedStudent(null); }}>
+          <Plus size={18} /> Add Student
+        </button>
+      </div>
+
+      <div className="filters-bar">
+        <div className="search-box">
+          <Search size={18} />
+          <input
+            type="text"
+            placeholder="Search students..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        <select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)} className="filter-select">
+          <option value="all">All Grades</option>
+          <option value="9th">9th Grade</option>
+          <option value="10th">10th Grade</option>
+          <option value="11th">11th Grade</option>
+          <option value="12th">12th Grade</option>
+        </select>
+      </div>
+
+      <div className="students-grid">
+        {filteredStudents.map(student => (
+          <div key={student.id} className="student-card">
+            <div className="student-header">
+              <div className="student-avatar">
+                {student.firstName[0]}{student.lastName[0]}
+              </div>
+              <div className="student-info">
+                <h3>{student.firstName} {student.lastName}</h3>
+                <p className="student-grade">{student.grade}</p>
+              </div>
+            </div>
+            
+            <div className="student-details">
+              {student.phone && (
+                <div className="detail-row">
+                  <Phone size={14} />
+                  <span>{student.phone}</span>
+                </div>
+              )}
+              {student.email && (
+                <div className="detail-row">
+                  <Mail size={14} />
+                  <span>{student.email}</span>
+                </div>
+              )}
+              <div className="detail-row">
+                <UserCheck size={14} />
+                <span>{student.responsibleServant}</span>
+              </div>
+            </div>
+            
+            <div className="student-actions">
+              <button className="icon-btn" onClick={() => { setSelectedStudent(student); setCurrentView('studentDetail'); }}>
+                <Eye size={16} />
+              </button>
+              <button className="icon-btn" onClick={() => { setSelectedStudent(student); setShowModal(true); }}>
+                <Edit2 size={16} />
+              </button>
+              <button className="icon-btn danger" onClick={() => deleteStudent(student.id)}>
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Component: Attendance Tracking
+  const AttendanceView = () => {
+    const [selectedDay, setSelectedDay] = useState('Friday');
+    const todayAttendance = attendance.filter(a => a.date === attendanceDate);
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <h1>Attendance Tracking</h1>
+          <div className="attendance-controls">
+            <input
+              type="date"
+              value={attendanceDate}
+              onChange={(e) => setAttendanceDate(e.target.value)}
+              className="date-input"
+            />
+            <div className="day-toggle">
+              <button
+                className={selectedDay === 'Friday' ? 'active' : ''}
+                onClick={() => setSelectedDay('Friday')}
+              >
+                Friday
+              </button>
+              <button
+                className={selectedDay === 'Saturday' ? 'active' : ''}
+                onClick={() => setSelectedDay('Saturday')}
+              >
+                Saturday
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="attendance-list">
+          {students.filter(s => s.status === 'Active').map(student => {
+            const hasRecord = todayAttendance.find(a => a.studentId === student.id);
+            return (
+              <div key={student.id} className="attendance-row">
+                <div className="student-name-col">
+                  <div className="student-avatar-sm">
+                    {student.firstName[0]}{student.lastName[0]}
+                  </div>
+                  <div>
+                    <div className="student-name">{student.firstName} {student.lastName}</div>
+                    <div className="student-grade-sm">{student.grade}</div>
+                  </div>
+                </div>
+                
+                <div className="attendance-actions">
+                  <button
+                    className={`attendance-btn ${hasRecord?.present === true ? 'present' : ''}`}
+                    onClick={() => markAttendance(student.id, true)}
+                  >
+                    <CheckSquare size={18} />
+                    Present
+                  </button>
+                  <button
+                    className={`attendance-btn ${hasRecord?.present === false ? 'absent' : ''}`}
+                    onClick={() => markAttendance(student.id, false)}
+                  >
+                    <X size={18} />
+                    Absent
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // Component: Servants Prep
+  const ServantsPrep = () => {
+    const [selectedStudent, setLocalStudent] = useState(null);
+    const [courseProgress, setCourseProgress] = useState({});
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <h1>Servants Preparation Program</h1>
+        </div>
+
+        <div className="prep-layout">
+          <div className="students-sidebar">
+            <h3>Students</h3>
+            {students.filter(s => s.status === 'Active').map(student => (
+              <div
+                key={student.id}
+                className={`sidebar-student ${selectedStudent?.id === student.id ? 'active' : ''}`}
+                onClick={() => setLocalStudent(student)}
+              >
+                <div className="student-avatar-sm">
+                  {student.firstName[0]}{student.lastName[0]}
+                </div>
+                <span>{student.firstName} {student.lastName}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="courses-content">
+            {selectedStudent ? (
+              <>
+                <div className="selected-student-header">
+                  <h2>{selectedStudent.firstName} {selectedStudent.lastName}</h2>
+                  <p>Servants Preparation Progress</p>
+                </div>
+                
+                <div className="courses-grid">
+                  {initialCourses.map(course => (
+                    <div key={course.id} className="course-card">
+                      <div className="course-header">
+                        <h3>{course.name}</h3>
+                        <span className="course-category">{course.category}</span>
+                      </div>
+                      <select className="course-status-select">
+                        <option value="not-started">Not Started</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="passed">Passed</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="empty-state">
+                <BookOpen size={48} />
+                <p>Select a student to view their course progress</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Component: Service Rotations
+  const ServiceRotationsView = () => (
+    <div className="content-section">
+      <div className="section-header">
+        <h1>Service Rotations</h1>
+        <button className="btn-primary">
+          <Plus size={18} /> Add Rotation
+        </button>
+      </div>
+      
+      <div className="rotations-calendar">
+        <div className="calendar-header">
+          <h3>October 2025</h3>
+        </div>
+        <div className="rotation-list">
+          <div className="rotation-item">
+            <div className="rotation-date">
+              <div className="date-day">04</div>
+              <div className="date-month">Oct</div>
+            </div>
+            <div className="rotation-details">
+              <h4>Altar Service</h4>
+              <p>Elijah Benjamin, Martin Kusto, Alexandra Gerges</p>
+            </div>
+          </div>
+          <div className="rotation-item">
+            <div className="rotation-date">
+              <div className="date-day">11</div>
+              <div className="date-month">Oct</div>
+            </div>
+            <div className="rotation-details">
+              <h4>Ushers</h4>
+              <p>Sandra Shonoda, Fady Said</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Component: Visitations
+  const VisitationsView = () => (
+    <div className="content-section">
+      <div className="section-header">
+        <h1>Visitations</h1>
+        <button className="btn-primary">
+          <Plus size={18} /> Schedule Visit
+        </button>
+      </div>
+
+      <div className="visitations-grid">
+        {students.slice(0, 6).map(student => (
+          <div key={student.id} className="visitation-card">
+            <div className="visitation-header">
+              <h3>{student.firstName} {student.lastName}</h3>
+              <span className="visit-status pending">Pending</span>
+            </div>
+            <div className="visitation-details">
+              <div className="detail-row">
+                <MapPin size={14} />
+                <span>Address needed</span>
+              </div>
+              <div className="detail-row">
+                <Calendar size={14} />
+                <span>Not scheduled</span>
+              </div>
+            </div>
+            <button className="btn-outline">Schedule Visit</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Component: Student Modal
+  const StudentModal = () => {
+    const [formData, setFormData] = useState(selectedStudent || {
+      firstName: '', lastName: '', grade: '9th', phone: '', email: '', 
+      dob: '', responsibleServant: '', status: 'Active'
+    });
+
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      if (selectedStudent) {
+        updateStudent(selectedStudent.id, formData);
+      } else {
+        addStudent(formData);
+      }
+    };
+
+    return (
+      <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2>{selectedStudent ? 'Edit Student' : 'Add New Student'}</h2>
+            <button className="icon-btn" onClick={() => setShowModal(false)}>
+              <X size={20} />
+            </button>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="student-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label>First Name *</label>
+                <input
+                  type="text"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Last Name *</label>
+                <input
+                  type="text"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Grade *</label>
+                <select
+                  value={formData.grade}
+                  onChange={(e) => setFormData({...formData, grade: e.target.value})}
+                  required
+                >
+                  <option value="9th">9th Grade</option>
+                  <option value="10th">10th Grade</option>
+                  <option value="11th">11th Grade</option>
+                  <option value="12th">12th Grade</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Date of Birth</label>
+                <input
+                  type="date"
+                  value={formData.dob}
+                  onChange={(e) => setFormData({...formData, dob: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Phone</label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Responsible Servant</label>
+              <select
+                value={formData.responsibleServant}
+                onChange={(e) => setFormData({...formData, responsibleServant: e.target.value})}
+              >
+                <option value="">Select Servant</option>
+                <option value="Veronia">Veronia</option>
+                <option value="Magda">Magda</option>
+                <option value="Kero">Kero Basely</option>
+                <option value="Nancy">Nancy</option>
+                <option value="Gerges">Gerges</option>
+                <option value="Mariam">Mariam</option>
+              </select>
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn-outline" onClick={() => setShowModal(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary">
+                <Save size={18} />
+                {selectedStudent ? 'Update' : 'Create'} Student
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // Main render
+  return (
+    <div className="app-container">
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <div className="logo">
+            <div className="logo-icon">✝</div>
+            <div className="logo-text">
+              <div className="logo-title">Youth Ministry</div>
+              <div className="logo-subtitle">HS 2025-2026</div>
+            </div>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          <button
+            className={`nav-item ${currentView === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setCurrentView('dashboard')}
+          >
+            <Home size={20} />
+            <span>Dashboard</span>
+          </button>
+          
+          <button
+            className={`nav-item ${currentView === 'students' ? 'active' : ''}`}
+            onClick={() => setCurrentView('students')}
+          >
+            <Users size={20} />
+            <span>Students</span>
+          </button>
+          
+          <button
+            className={`nav-item ${currentView === 'attendance' ? 'active' : ''}`}
+            onClick={() => setCurrentView('attendance')}
+          >
+            <CheckSquare size={20} />
+            <span>Attendance</span>
+          </button>
+          
+          <button
+            className={`nav-item ${currentView === 'servantsPrep' ? 'active' : ''}`}
+            onClick={() => setCurrentView('servantsPrep')}
+          >
+            <BookOpen size={20} />
+            <span>Servants Prep</span>
+          </button>
+          
+          <button
+            className={`nav-item ${currentView === 'rotations' ? 'active' : ''}`}
+            onClick={() => setCurrentView('rotations')}
+          >
+            <Calendar size={20} />
+            <span>Service Rotations</span>
+          </button>
+          
+          <button
+            className={`nav-item ${currentView === 'visitations' ? 'active' : ''}`}
+            onClick={() => setCurrentView('visitations')}
+          >
+            <MapPin size={20} />
+            <span>Visitations</span>
+          </button>
+        </nav>
+
+        <div className="sidebar-footer">
+          <button className="nav-item">
+            <Settings size={20} />
+            <span>Settings</span>
+          </button>
+        </div>
+      </aside>
+
+      <main className="main-content">
+        <header className="top-header">
+          <div className="header-left">
+            <h1 className="page-title">
+              {currentView === 'dashboard' && 'Dashboard'}
+              {currentView === 'students' && 'Students'}
+              {currentView === 'attendance' && 'Attendance'}
+              {currentView === 'servantsPrep' && 'Servants Preparation'}
+              {currentView === 'rotations' && 'Service Rotations'}
+              {currentView === 'visitations' && 'Visitations'}
+            </h1>
+          </div>
+          <div className="header-right">
+            <button className="icon-btn">
+              <Bell size={20} />
+            </button>
+            <div className="user-menu">
+              <div className="user-avatar">AS</div>
+            </div>
+          </div>
+        </header>
+
+        <div className="content-wrapper">
+          {currentView === 'dashboard' && <Dashboard />}
+          {currentView === 'students' && <StudentsView />}
+          {currentView === 'attendance' && <AttendanceView />}
+          {currentView === 'servantsPrep' && <ServantsPrep />}
+          {currentView === 'rotations' && <ServiceRotationsView />}
+          {currentView === 'visitations' && <VisitationsView />}
+        </div>
+      </main>
+
+      {showModal && <StudentModal />}
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
+
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
+        :root {
+          --primary: #8B4513;
+          --primary-light: #A0522D;
+          --primary-dark: #654321;
+          --secondary: #D4AF37;
+          --accent: #2F4F4F;
+          --success: #4A7C4E;
+          --warning: #D4A017;
+          --danger: #A52A2A;
+          --bg-light: #FAF8F3;
+          --bg-paper: #FFFFFF;
+          --text-primary: #2C1810;
+          --text-secondary: #6B5D52;
+          --border: #E8DFD4;
+          --shadow: rgba(139, 69, 19, 0.08);
+          --shadow-md: rgba(139, 69, 19, 0.12);
+          --shadow-lg: rgba(139, 69, 19, 0.16);
+        }
+
+        body {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          background: var(--bg-light);
+          color: var(--text-primary);
+          line-height: 1.6;
+          overflow-x: hidden;
+        }
+
+        .app-container {
+          display: flex;
+          min-height: 100vh;
+          background: linear-gradient(135deg, #FAF8F3 0%, #F5EFE7 100%);
+        }
+
+        /* Sidebar */
+        .sidebar {
+          width: 280px;
+          background: var(--bg-paper);
+          border-right: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          position: fixed;
+          height: 100vh;
+          z-index: 100;
+          box-shadow: 4px 0 16px var(--shadow);
+        }
+
+        .sidebar-header {
+          padding: 2rem 1.5rem;
+          border-bottom: 1px solid var(--border);
+          background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        }
+
+        .logo {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .logo-icon {
+          width: 48px;
+          height: 48px;
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 28px;
+          color: white;
+          font-weight: 600;
+          border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .logo-text {
+          color: white;
+        }
+
+        .logo-title {
+          font-family: 'Crimson Pro', serif;
+          font-size: 1.25rem;
+          font-weight: 700;
+          letter-spacing: -0.02em;
+        }
+
+        .logo-subtitle {
+          font-size: 0.75rem;
+          opacity: 0.85;
+          font-weight: 500;
+        }
+
+        .sidebar-nav {
+          flex: 1;
+          padding: 1.5rem 1rem;
+          overflow-y: auto;
+        }
+
+        .nav-item {
+          width: 100%;
+          padding: 0.875rem 1rem;
+          margin-bottom: 0.375rem;
+          display: flex;
+          align-items: center;
+          gap: 0.875rem;
+          background: none;
+          border: none;
+          border-radius: 10px;
+          color: var(--text-secondary);
+          font-size: 0.9375rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: left;
+        }
+
+        .nav-item:hover {
+          background: var(--bg-light);
+          color: var(--primary);
+          transform: translateX(4px);
+        }
+
+        .nav-item.active {
+          background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+          color: white;
+          box-shadow: 0 4px 12px var(--shadow-md);
+        }
+
+        .sidebar-footer {
+          padding: 1rem;
+          border-top: 1px solid var(--border);
+        }
+
+        /* Main Content */
+        .main-content {
+          flex: 1;
+          margin-left: 280px;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .top-header {
+          background: var(--bg-paper);
+          border-bottom: 1px solid var(--border);
+          padding: 1.25rem 2rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          box-shadow: 0 2px 8px var(--shadow);
+          position: sticky;
+          top: 0;
+          z-index: 90;
+        }
+
+        .page-title {
+          font-family: 'Crimson Pro', serif;
+          font-size: 1.75rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          letter-spacing: -0.02em;
+        }
+
+        .header-right {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .user-avatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: 600;
+          font-size: 0.875rem;
+          cursor: pointer;
+          border: 2px solid var(--border);
+        }
+
+        .content-wrapper {
+          flex: 1;
+          padding: 2rem;
+          overflow-y: auto;
+        }
+
+        /* Dashboard */
+        .dashboard-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 1.5rem;
+        }
+
+        .stat-card {
+          background: var(--bg-paper);
+          border-radius: 16px;
+          padding: 1.75rem;
+          display: flex;
+          align-items: center;
+          gap: 1.25rem;
+          border: 1px solid var(--border);
+          box-shadow: 0 4px 16px var(--shadow);
+          transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 8px 24px var(--shadow-md);
+        }
+
+        .stat-icon {
+          width: 64px;
+          height: 64px;
+          border-radius: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+        }
+
+        .stat-primary .stat-icon {
+          background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        }
+
+        .stat-secondary .stat-icon {
+          background: linear-gradient(135deg, var(--secondary) 0%, #DAA520 100%);
+        }
+
+        .stat-accent .stat-icon {
+          background: linear-gradient(135deg, var(--accent) 0%, #3A5F5F 100%);
+        }
+
+        .stat-warning .stat-icon {
+          background: linear-gradient(135deg, var(--warning) 0%, #E5B80B 100%);
+        }
+
+        .stat-content {
+          flex: 1;
+        }
+
+        .stat-label {
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+          font-weight: 500;
+          margin-bottom: 0.375rem;
+        }
+
+        .stat-value {
+          font-size: 2rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          font-family: 'Crimson Pro', serif;
+        }
+
+        .dashboard-section {
+          grid-column: 1 / -1;
+          background: var(--bg-paper);
+          border-radius: 16px;
+          padding: 2rem;
+          border: 1px solid var(--border);
+          box-shadow: 0 4px 16px var(--shadow);
+        }
+
+        .dashboard-section h2 {
+          font-family: 'Crimson Pro', serif;
+          font-size: 1.5rem;
+          font-weight: 700;
+          margin-bottom: 1.5rem;
+          color: var(--text-primary);
+        }
+
+        .activity-list {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .activity-item {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 1rem;
+          background: var(--bg-light);
+          border-radius: 10px;
+          border: 1px solid var(--border);
+        }
+
+        .activity-item svg {
+          color: var(--primary);
+          flex-shrink: 0;
+        }
+
+        .activity-time {
+          margin-left: auto;
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+        }
+
+        .action-buttons {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1rem;
+        }
+
+        .action-btn {
+          padding: 1rem 1.5rem;
+          background: var(--bg-light);
+          border: 2px solid var(--border);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          font-weight: 600;
+          color: var(--text-primary);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+          background: var(--primary);
+          color: white;
+          border-color: var(--primary);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px var(--shadow-md);
+        }
+
+        /* Buttons */
+        .btn-primary {
+          padding: 0.75rem 1.5rem;
+          background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+          color: white;
+          border: none;
+          border-radius: 10px;
+          font-weight: 600;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.9375rem;
+          transition: all 0.2s ease;
+          box-shadow: 0 4px 12px var(--shadow-md);
+        }
+
+        .btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px var(--shadow-lg);
+        }
+
+        .btn-outline {
+          padding: 0.625rem 1.25rem;
+          background: transparent;
+          border: 2px solid var(--primary);
+          color: var(--primary);
+          border-radius: 10px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          font-size: 0.9375rem;
+        }
+
+        .btn-outline:hover {
+          background: var(--primary);
+          color: white;
+        }
+
+        .icon-btn {
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          background: var(--bg-light);
+          border: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          color: var(--text-secondary);
+        }
+
+        .icon-btn:hover {
+          background: var(--primary);
+          color: white;
+          border-color: var(--primary);
+        }
+
+        .icon-btn.danger:hover {
+          background: var(--danger);
+          border-color: var(--danger);
+        }
+
+        /* Section Header */
+        .section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 2rem;
+        }
+
+        .section-header h1 {
+          font-family: 'Crimson Pro', serif;
+          font-size: 2rem;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+
+        /* Filters */
+        .filters-bar {
+          display: flex;
+          gap: 1rem;
+          margin-bottom: 2rem;
+        }
+
+        .search-box {
+          flex: 1;
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .search-box svg {
+          position: absolute;
+          left: 1rem;
+          color: var(--text-secondary);
+        }
+
+        .search-box input {
+          width: 100%;
+          padding: 0.875rem 1rem 0.875rem 3rem;
+          border: 2px solid var(--border);
+          border-radius: 10px;
+          font-size: 0.9375rem;
+          background: var(--bg-paper);
+          transition: all 0.2s ease;
+        }
+
+        .search-box input:focus {
+          outline: none;
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
+        }
+
+        .filter-select {
+          padding: 0.875rem 1rem;
+          border: 2px solid var(--border);
+          border-radius: 10px;
+          background: var(--bg-paper);
+          font-size: 0.9375rem;
+          cursor: pointer;
+          min-width: 180px;
+          transition: all 0.2s ease;
+        }
+
+        .filter-select:focus {
+          outline: none;
+          border-color: var(--primary);
+        }
+
+        /* Students Grid */
+        .students-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+          gap: 1.5rem;
+        }
+
+        .student-card {
+          background: var(--bg-paper);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 1.5rem;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .student-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 8px 24px var(--shadow-md);
+          border-color: var(--primary-light);
+        }
+
+        .student-header {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          margin-bottom: 1.25rem;
+          padding-bottom: 1.25rem;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .student-avatar {
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          font-size: 1.125rem;
+          border: 3px solid var(--bg-paper);
+          box-shadow: 0 4px 12px var(--shadow-md);
+        }
+
+        .student-avatar-sm {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 600;
+          font-size: 0.875rem;
+          flex-shrink: 0;
+        }
+
+        .student-info h3 {
+          font-size: 1.125rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin-bottom: 0.25rem;
+        }
+
+        .student-grade {
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+          font-weight: 500;
+        }
+
+        .student-details {
+          margin-bottom: 1.25rem;
+        }
+
+        .detail-row {
+          display: flex;
+          align-items: center;
+          gap: 0.625rem;
+          padding: 0.5rem 0;
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+        }
+
+        .detail-row svg {
+          color: var(--primary);
+          flex-shrink: 0;
+        }
+
+        .student-actions {
+          display: flex;
+          gap: 0.5rem;
+          padding-top: 1rem;
+          border-top: 1px solid var(--border);
+        }
+
+        /* Attendance */
+        .attendance-controls {
+          display: flex;
+          gap: 1rem;
+          align-items: center;
+        }
+
+        .date-input {
+          padding: 0.75rem 1rem;
+          border: 2px solid var(--border);
+          border-radius: 10px;
+          font-size: 0.9375rem;
+          background: var(--bg-paper);
+          cursor: pointer;
+        }
+
+        .day-toggle {
+          display: flex;
+          background: var(--bg-light);
+          border-radius: 10px;
+          padding: 0.25rem;
+          border: 2px solid var(--border);
+        }
+
+        .day-toggle button {
+          padding: 0.625rem 1.5rem;
+          border: none;
+          background: transparent;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          color: var(--text-secondary);
+        }
+
+        .day-toggle button.active {
+          background: var(--primary);
+          color: white;
+          box-shadow: 0 2px 8px var(--shadow-md);
+        }
+
+        .attendance-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+
+        .attendance-row {
+          background: var(--bg-paper);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 1.25rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          transition: all 0.2s ease;
+        }
+
+        .attendance-row:hover {
+          box-shadow: 0 4px 16px var(--shadow);
+          border-color: var(--primary-light);
+        }
+
+        .student-name-col {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .student-name {
+          font-weight: 600;
+          color: var(--text-primary);
+          font-size: 1rem;
+        }
+
+        .student-grade-sm {
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+        }
+
+        .attendance-actions {
+          display: flex;
+          gap: 0.75rem;
+        }
+
+        .attendance-btn {
+          padding: 0.625rem 1.25rem;
+          border: 2px solid var(--border);
+          background: var(--bg-light);
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          color: var(--text-secondary);
+        }
+
+        .attendance-btn:hover {
+          border-color: var(--primary);
+          color: var(--primary);
+        }
+
+        .attendance-btn.present {
+          background: var(--success);
+          color: white;
+          border-color: var(--success);
+        }
+
+        .attendance-btn.absent {
+          background: var(--danger);
+          color: white;
+          border-color: var(--danger);
+        }
+
+        /* Servants Prep */
+        .prep-layout {
+          display: grid;
+          grid-template-columns: 280px 1fr;
+          gap: 2rem;
+          height: calc(100vh - 200px);
+        }
+
+        .students-sidebar {
+          background: var(--bg-paper);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 1.5rem;
+          overflow-y: auto;
+          box-shadow: 0 4px 16px var(--shadow);
+        }
+
+        .students-sidebar h3 {
+          font-family: 'Crimson Pro', serif;
+          font-size: 1.25rem;
+          margin-bottom: 1rem;
+          color: var(--text-primary);
+        }
+
+        .sidebar-student {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.875rem;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          margin-bottom: 0.5rem;
+        }
+
+        .sidebar-student:hover {
+          background: var(--bg-light);
+        }
+
+        .sidebar-student.active {
+          background: var(--primary);
+          color: white;
+        }
+
+        .sidebar-student.active .student-avatar-sm {
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+        .courses-content {
+          background: var(--bg-paper);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 2rem;
+          overflow-y: auto;
+          box-shadow: 0 4px 16px var(--shadow);
+        }
+
+        .selected-student-header {
+          margin-bottom: 2rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 2px solid var(--border);
+        }
+
+        .selected-student-header h2 {
+          font-family: 'Crimson Pro', serif;
+          font-size: 1.75rem;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        }
+
+        .selected-student-header p {
+          color: var(--text-secondary);
+          font-size: 1rem;
+        }
+
+        .courses-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 1.25rem;
+        }
+
+        .course-card {
+          background: var(--bg-light);
+          border: 2px solid var(--border);
+          border-radius: 12px;
+          padding: 1.25rem;
+          transition: all 0.2s ease;
+        }
+
+        .course-card:hover {
+          border-color: var(--primary-light);
+          box-shadow: 0 4px 16px var(--shadow);
+        }
+
+        .course-header {
+          margin-bottom: 1rem;
+        }
+
+        .course-header h3 {
+          font-size: 1.125rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin-bottom: 0.5rem;
+        }
+
+        .course-category {
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+          font-weight: 500;
+        }
+
+        .course-status-select {
+          width: 100%;
+          padding: 0.75rem;
+          border: 2px solid var(--border);
+          border-radius: 8px;
+          background: var(--bg-paper);
+          font-size: 0.9375rem;
+          font-weight: 500;
+          cursor: pointer;
+        }
+
+        .empty-state {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          color: var(--text-secondary);
+          text-align: center;
+        }
+
+        .empty-state svg {
+          margin-bottom: 1rem;
+          opacity: 0.5;
+        }
+
+        /* Rotations & Visitations */
+        .rotations-calendar, .visitations-grid {
+          background: var(--bg-paper);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 2rem;
+          box-shadow: 0 4px 16px var(--shadow);
+        }
+
+        .visitations-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+          gap: 1.5rem;
+          padding: 0;
+          background: transparent;
+          border: none;
+          box-shadow: none;
+        }
+
+        .rotation-list {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          margin-top: 1.5rem;
+        }
+
+        .rotation-item {
+          display: flex;
+          gap: 1.5rem;
+          padding: 1.5rem;
+          background: var(--bg-light);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          transition: all 0.2s ease;
+        }
+
+        .rotation-item:hover {
+          border-color: var(--primary);
+          box-shadow: 0 4px 16px var(--shadow);
+        }
+
+        .rotation-date {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: var(--primary);
+          color: white;
+          border-radius: 10px;
+          padding: 1rem;
+          min-width: 70px;
+        }
+
+        .date-day {
+          font-size: 1.75rem;
+          font-weight: 700;
+          line-height: 1;
+        }
+
+        .date-month {
+          font-size: 0.875rem;
+          opacity: 0.9;
+          margin-top: 0.25rem;
+        }
+
+        .rotation-details h4 {
+          font-size: 1.125rem;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+          color: var(--text-primary);
+        }
+
+        .rotation-details p {
+          color: var(--text-secondary);
+          font-size: 0.9375rem;
+        }
+
+        .visitation-card {
+          background: var(--bg-paper);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 1.5rem;
+          box-shadow: 0 2px 8px var(--shadow);
+          transition: all 0.3s ease;
+        }
+
+        .visitation-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 8px 24px var(--shadow-md);
+        }
+
+        .visitation-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: start;
+          margin-bottom: 1rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .visitation-header h3 {
+          font-size: 1.125rem;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+
+        .visit-status {
+          padding: 0.375rem 0.75rem;
+          border-radius: 20px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+        }
+
+        .visit-status.pending {
+          background: #FFF4E6;
+          color: var(--warning);
+        }
+
+        .visit-status.completed {
+          background: #E8F5E9;
+          color: var(--success);
+        }
+
+        .visitation-details {
+          margin-bottom: 1.25rem;
+        }
+
+        /* Modal */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(44, 24, 16, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          backdrop-filter: blur(4px);
+          animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .modal-content {
+          background: var(--bg-paper);
+          border-radius: 20px;
+          width: 90%;
+          max-width: 600px;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 20px 60px rgba(139, 69, 19, 0.3);
+          animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+          from {
+            transform: translateY(30px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 2rem;
+          border-bottom: 2px solid var(--border);
+        }
+
+        .modal-header h2 {
+          font-family: 'Crimson Pro', serif;
+          font-size: 1.75rem;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+
+        .student-form {
+          padding: 2rem;
+        }
+
+        .form-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+          margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+          display: block;
+          margin-bottom: 0.5rem;
+          font-weight: 600;
+          color: var(--text-primary);
+          font-size: 0.9375rem;
+        }
+
+        .form-group input,
+        .form-group select {
+          width: 100%;
+          padding: 0.875rem 1rem;
+          border: 2px solid var(--border);
+          border-radius: 10px;
+          font-size: 0.9375rem;
+          background: var(--bg-paper);
+          transition: all 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+          outline: none;
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
+        }
+
+        .modal-actions {
+          display: flex;
+          gap: 1rem;
+          justify-content: flex-end;
+          padding-top: 1.5rem;
+          border-top: 2px solid var(--border);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: var(--bg-light);
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: var(--border);
+          border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: var(--primary-light);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+          .sidebar {
+            width: 240px;
+          }
+          
+          .main-content {
+            margin-left: 240px;
+          }
+
+          .prep-layout {
+            grid-template-columns: 1fr;
+          }
+
+          .students-sidebar {
+            max-height: 300px;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .sidebar {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+          }
+
+          .sidebar.open {
+            transform: translateX(0);
+          }
+
+          .main-content {
+            margin-left: 0;
+          }
+
+          .dashboard-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .students-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .form-row {
+            grid-template-columns: 1fr;
+          }
+
+          .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+// Export removed for browser compatibility - component is available globally
+// export default YouthMinistryApp;
