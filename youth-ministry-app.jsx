@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Users, BookOpen, CheckSquare, MapPin, UserCheck, Settings, Home, Bell, Search, Download, Upload, Plus, Edit2, Trash2, Eye, Filter, X, Save, ChevronDown, ChevronRight, Clock, Mail, Phone, Award, Activity } from 'lucide-react';
+// React hooks available globally
+const { useState, useEffect } = React;
+// Icons are now defined inline in index.html
 
 // Initial data structure based on the Excel file
 const initialStudents = [
@@ -1809,4 +1810,5 @@ const YouthMinistryApp = () => {
   );
 };
 
-export default YouthMinistryApp;
+// Export removed for browser compatibility - component is available globally
+// export default YouthMinistryApp;
