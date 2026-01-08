@@ -1,0 +1,47 @@
+{
+  "name": "youth-ministry-management-system",
+  "version": "1.0.0",
+  "description": "Comprehensive web application for managing high school youth ministry programs",
+  "main": "index.html",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "lucide-react": "^0.294.0"
+  },
+  "devDependencies": {
+    "react-scripts": "5.0.1",
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "keywords": [
+    "youth-ministry",
+    "church-management",
+    "attendance-tracking",
+    "student-management",
+    "react"
+  ],
+  "author": "Youth Ministry Team",
+  "license": "MIT"
+}
