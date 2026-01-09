@@ -1,5 +1,6 @@
 const USERS_KEY = 'yms_auth_users';
 const SESSIONS_KEY = 'yms_auth_sessions';
+const AUDIT_KEY = 'yms_auth_audit';
 const SCHEMA_VERSION_KEY = 'yms_auth_schema_version';
 const SCHEMA_VERSION = 1;
 
@@ -26,6 +27,7 @@ export function initAuthStorage() {
   if (version !== SCHEMA_VERSION) {
     writeJson(USERS_KEY, []);
     writeJson(SESSIONS_KEY, []);
+    writeJson(AUDIT_KEY, []);
     writeJson(SCHEMA_VERSION_KEY, SCHEMA_VERSION);
     return;
   }
@@ -36,6 +38,10 @@ export function initAuthStorage() {
 
   if (!Array.isArray(readJson(SESSIONS_KEY, null))) {
     writeJson(SESSIONS_KEY, []);
+  }
+
+  if (!Array.isArray(readJson(AUDIT_KEY, null))) {
+    writeJson(AUDIT_KEY, []);
   }
 }
 
@@ -53,6 +59,19 @@ export function readSessions() {
 
 export function writeSessions(sessions) {
   writeJson(SESSIONS_KEY, sessions);
+}
+
+export function readAudit() {
+  return readJson(AUDIT_KEY, []);
+}
+
+export function writeAudit(entries) {
+  writeJson(AUDIT_KEY, entries);
+}
+
+export function appendAudit(entry) {
+  const entries = readAudit();
+  writeAudit([entry, ...entries].slice(0, 500));
 }
 
 export function buildAuthIndexes(users, sessions) {

@@ -1,19 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Users, BookOpen, CheckSquare, MapPin, UserCheck, Settings, Home, Bell, Search, Download, Upload, Plus, Edit2, Trash2, Eye, EyeOff, LogOut, KeyRound, Filter, X, Save, ChevronDown, ChevronRight, Clock, Mail, Phone, Award, Activity, Copy, FileUp, FileDown, AlertCircle } from 'lucide-react';
 import Papa from 'papaparse';
-import { useAuth } from './auth/AuthContext.jsx';
-import { getAllUsers, createUser, updateUser, resetPassword, unlockAccount } from './auth/service.js';
-import { readAudit } from './auth/db.js';
-import { ReadOnlyBanner } from './auth/RequirePermission.jsx';
+import { readUsers, writeUsers, readSessions, writeSessions, readAudit, appendAudit } from './auth/db.js';
 import './App.css';
 
-// Helper functions
+const ACTIVE_SESSION_KEY = 'yms_auth_active_session';
+const AUTH_SESSION_MINUTES = 30;
+const AUTH_REMEMBER_DAYS = 7;
+const AUTH_LOCKOUT_MINUTES = 15;
+const PASSWORD_SALT = 'yms_v1';
+const textEncoder = new TextEncoder();
+
 const toInitials = (name = '') => name
   .split(' ')
   .filter(Boolean)
   .slice(0, 2)
   .map((part) => part[0].toUpperCase())
   .join('') || 'YM';
+
+const formatAuthError = (message) => message || 'Something went wrong. Please try again.';
+
+const normalizeUsername = (value = '') => value.trim().toLowerCase();
+
+const nowIso = () => new Date().toISOString();
+
+const addMinutes = (minutes) => new Date(Date.now() + minutes * 60 * 1000).toISOString();
+
+const addDays = (days) => new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+const isSessionActive = (session) => session && new Date(session.expiresAt).getTime() > Date.now();
+
+const generateToken = () => {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+};
+
+const hashPassword = async (password) => {
+  const data = textEncoder.encode(`${PASSWORD_SALT}:${password}`);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('');
+};
 
 // Custom hook for localStorage persistence
 function useLocalStorage(key, initialValue) {
@@ -158,6 +186,10 @@ const initialCourses = [
 ];
 
 const YouthMinistryApp = () => {
+  const [authMode, setAuthMode] = useState('loading');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authError, setAuthError] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
   const [students, setStudents] = useLocalStorage('yms_students', initialStudents);
   const [attendance, setAttendance] = useLocalStorage('yms_attendance', initialAttendance);
@@ -171,23 +203,201 @@ const YouthMinistryApp = () => {
   const [teachingSchedule, setTeachingSchedule] = useLocalStorage('yms_teachingSchedule', []);
   const [courseProgress, setCourseProgress] = useLocalStorage('yms_courseProgress', []);
 
-  const { currentUser, logout, hasPermission } = useAuth();
+  useEffect(() => {
+    const users = readUsers();
+    const sessions = readSessions();
+    const activeToken = localStorage.getItem(ACTIVE_SESSION_KEY);
 
-  const canManageStudents = hasPermission('canManageStudents');
-  const canMarkAttendance = hasPermission('canMarkAttendance');
-  const canManageCourses = hasPermission('canManageCourses');
-  const canScheduleServices = hasPermission('canScheduleServices');
-  const canManageVisitations = hasPermission('canManageVisitations');
-  const canExportData = hasPermission('canExportData');
-  const canImportData = hasPermission('canImportData');
-  const canManageUsers = hasPermission('canManageUsers');
-  const canDeleteRecords = hasPermission('canDeleteRecords');
-  const canViewAuditLog = hasPermission('canViewAuditLog');
-  const canEditStudents = canManageStudents;
-  const canEditAttendance = canMarkAttendance;
-  const canEditCourses = canManageCourses;
-  const canEditRotations = canScheduleServices;
-  const canEditVisitations = canManageVisitations;
+    if (!users.length) {
+      setAuthMode('setup');
+      return;
+    }
+
+    if (activeToken) {
+      const activeSession = sessions.find((session) => session.sessionToken === activeToken);
+      if (activeSession && isSessionActive(activeSession)) {
+        const user = users.find((item) => item.id === activeSession.userId && item.isActive);
+        if (user) {
+          setCurrentUser(user);
+          setAuthMode('app');
+          return;
+        }
+      }
+    }
+
+    setAuthMode('login');
+  }, []);
+
+  useEffect(() => {
+    if (authMode !== 'app' || !currentUser) return undefined;
+
+    const intervalId = setInterval(() => {
+      const sessions = readSessions();
+      const activeToken = localStorage.getItem(ACTIVE_SESSION_KEY);
+      const activeSession = sessions.find((session) => session.sessionToken === activeToken);
+
+      if (!activeSession || !isSessionActive(activeSession)) {
+        handleLogout();
+      }
+    }, 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [authMode, currentUser]);
+
+  const createSessionForUser = (userId, remember) => {
+    const sessions = readSessions().filter((session) => isSessionActive(session));
+    const expiresAt = remember ? addDays(AUTH_REMEMBER_DAYS) : addMinutes(AUTH_SESSION_MINUTES);
+    const session = {
+      id: Date.now(),
+      userId,
+      sessionToken: generateToken(),
+      expiresAt,
+      createdAt: nowIso()
+    };
+
+    writeSessions([...sessions, session]);
+    localStorage.setItem(ACTIVE_SESSION_KEY, session.sessionToken);
+    return session;
+  };
+
+  const logAudit = (action, detail, actor = currentUser) => {
+    appendAudit({
+      id: Date.now(),
+      timestamp: nowIso(),
+      actorId: actor?.id || null,
+      actorName: actor?.fullName || actor?.username || 'System',
+      action,
+      detail
+    });
+  };
+
+  const handleLogout = () => {
+    if (currentUser) {
+      logAudit('Logout', `User ${currentUser.username} logged out.`, currentUser);
+    }
+    const activeToken = localStorage.getItem(ACTIVE_SESSION_KEY);
+    if (activeToken) {
+      const sessions = readSessions().filter((session) => session.sessionToken !== activeToken);
+      writeSessions(sessions);
+    }
+    localStorage.removeItem(ACTIVE_SESSION_KEY);
+    setCurrentUser(null);
+    setAuthMode('login');
+  };
+
+  const handleSetup = async (payload) => {
+    setAuthBusy(true);
+    setAuthError('');
+    try {
+      const users = readUsers();
+      if (users.length) {
+        setAuthMode('login');
+        return;
+      }
+
+      if (payload.password.length < 8 || !/[0-9]/.test(payload.password) || !/[A-Za-z]/.test(payload.password)) {
+        setAuthError('Password must be at least 8 characters and include letters and numbers.');
+        return;
+      }
+
+      if (payload.password !== payload.confirmPassword) {
+        setAuthError('Passwords do not match.');
+        return;
+      }
+
+      const passwordHash = await hashPassword(payload.password);
+      const newUser = {
+        id: Date.now(),
+        username: normalizeUsername(payload.username),
+        passwordHash,
+        fullName: payload.fullName.trim(),
+        email: payload.email.trim(),
+        role: 'admin',
+        isActive: true,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        failedAttempts: 0,
+        lockedUntil: null
+      };
+
+      writeUsers([newUser]);
+      createSessionForUser(newUser.id, true);
+      logAudit('Setup', `Initial admin account created (${newUser.username}).`, newUser);
+      setCurrentUser(newUser);
+      setAuthMode('app');
+    } catch (error) {
+      console.error('Setup failed', error);
+      setAuthError(formatAuthError());
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleLogin = async ({ username, password, remember }) => {
+    setAuthBusy(true);
+    setAuthError('');
+    try {
+      const users = readUsers();
+      const normalized = normalizeUsername(username);
+      const index = users.findIndex((user) => user.username === normalized);
+
+      if (index === -1) {
+        setAuthError('Invalid username or password.');
+        return;
+      }
+
+      const user = users[index];
+      if (!user.isActive) {
+        setAuthError('Account is inactive. Contact an administrator.');
+        return;
+      }
+
+      if (user.lockedUntil && new Date(user.lockedUntil).getTime() > Date.now()) {
+        setAuthError('Account locked due to failed attempts. Please try again later.');
+        return;
+      }
+
+      const passwordHash = await hashPassword(password);
+      if (passwordHash !== user.passwordHash) {
+        const attempts = (user.failedAttempts || 0) + 1;
+        const updatedUser = {
+          ...user,
+          failedAttempts: attempts,
+          lockedUntil: attempts >= 5 ? addMinutes(AUTH_LOCKOUT_MINUTES) : user.lockedUntil,
+          updatedAt: nowIso()
+        };
+        users[index] = updatedUser;
+        writeUsers(users);
+        setAuthError('Invalid username or password.');
+        return;
+      }
+
+      const updatedUser = {
+        ...user,
+        failedAttempts: 0,
+        lockedUntil: null,
+        lastLogin: nowIso(),
+        updatedAt: nowIso()
+      };
+      users[index] = updatedUser;
+      writeUsers(users);
+      createSessionForUser(updatedUser.id, remember);
+      logAudit('Login', `User ${updatedUser.username} logged in.`, updatedUser);
+      setCurrentUser(updatedUser);
+      setAuthMode('app');
+    } catch (error) {
+      console.error('Login failed', error);
+      setAuthError(formatAuthError());
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const role = currentUser?.role || 'viewer';
+  const canEdit = role === 'admin' || role === 'servant';
+  const canDelete = role === 'admin';
+  const canImport = canEdit;
+  const canManageUsers = role === 'admin';
 
   // Calculate statistics
   const calculateAttendancePercentage = () => {
@@ -224,7 +434,7 @@ const YouthMinistryApp = () => {
 
   // Attendance marking
   const markAttendance = (studentId, present) => {
-    if (!canEditAttendance) return;
+    if (!canEdit) return;
     const newRecord = {
       id: Date.now(),
       studentId,
@@ -237,20 +447,20 @@ const YouthMinistryApp = () => {
 
   // Student CRUD operations
   const addStudent = (studentData) => {
-    if (!canEditStudents) return;
+    if (!canEdit) return;
     setStudents([...students, { ...studentData, id: Date.now() }]);
     setShowModal(false);
   };
 
   const updateStudent = (id, studentData) => {
-    if (!canEditStudents) return;
+    if (!canEdit) return;
     setStudents(students.map(s => s.id === id ? { ...s, ...studentData } : s));
     setShowModal(false);
     setSelectedStudent(null);
   };
 
   const deleteStudent = (id) => {
-    if (!canDeleteRecords) return;
+    if (!canDelete) return;
     if (confirm('Are you sure you want to delete this student?')) {
       setStudents(students.filter(s => s.id !== id));
     }
@@ -409,14 +619,14 @@ const YouthMinistryApp = () => {
     <div className="content-section">
       <div className="section-header">
         <h1>Students Management</h1>
-        {canEditStudents && (
+        {canEdit && (
           <button className="btn-primary" onClick={() => { setShowModal(true); setSelectedStudent(null); }}>
             <Plus size={18} /> Add Student
           </button>
         )}
       </div>
 
-      <ReadOnlyBanner permission="canManageStudents" />
+      {!canEdit && <ReadOnlyNotice />}
 
       <div className="filters-bar">
         <div className="search-box">
@@ -491,12 +701,12 @@ const YouthMinistryApp = () => {
               <button className="icon-btn" onClick={() => { setSelectedStudent(student); setCurrentView('studentDetail'); }}>
                 <Eye size={16} />
               </button>
-              {canEditStudents && (
+              {canEdit && (
                 <button className="icon-btn" onClick={() => { setSelectedStudent(student); setShowModal(true); }}>
                   <Edit2 size={16} />
                 </button>
               )}
-              {canDeleteRecords && (
+              {canDelete && (
                 <button className="icon-btn danger" onClick={() => deleteStudent(student.id)}>
                   <Trash2 size={16} />
                 </button>
@@ -514,7 +724,7 @@ const YouthMinistryApp = () => {
     const todayAttendance = attendance.filter(a => a.date === attendanceDate);
 
     const markAllPresent = () => {
-      if (!canEditAttendance) return;
+      if (!canEdit) return;
       const activeStudents = students.filter(s => s.status === 'Active');
       const newRecords = activeStudents
         .filter(student => !todayAttendance.find(a => a.studentId === student.id))
@@ -535,7 +745,7 @@ const YouthMinistryApp = () => {
     };
 
     const markAllAbsent = () => {
-      if (!canEditAttendance) return;
+      if (!canEdit) return;
       const activeStudents = students.filter(s => s.status === 'Active');
       const newRecords = activeStudents
         .filter(student => !todayAttendance.find(a => a.studentId === student.id))
@@ -556,7 +766,7 @@ const YouthMinistryApp = () => {
     };
 
     const copyFromLastWeek = () => {
-      if (!canEditAttendance) return;
+      if (!canEdit) return;
       const selectedDate = new Date(attendanceDate);
       const lastWeekDate = new Date(selectedDate);
       lastWeekDate.setDate(lastWeekDate.getDate() - 7);
@@ -610,18 +820,18 @@ const YouthMinistryApp = () => {
           </div>
         </div>
 
-        <ReadOnlyBanner permission="canMarkAttendance" />
+        {!canEdit && <ReadOnlyNotice />}
 
         <div className="bulk-actions">
-          <button className="bulk-btn" onClick={markAllPresent} disabled={!canEditAttendance} aria-disabled={!canEditAttendance}>
+          <button className="bulk-btn" onClick={markAllPresent} disabled={!canEdit} aria-disabled={!canEdit}>
             <CheckSquare size={16} />
             Mark All Present
           </button>
-          <button className="bulk-btn" onClick={markAllAbsent} disabled={!canEditAttendance} aria-disabled={!canEditAttendance}>
+          <button className="bulk-btn" onClick={markAllAbsent} disabled={!canEdit} aria-disabled={!canEdit}>
             <X size={16} />
             Mark All Absent
           </button>
-          <button className="bulk-btn" onClick={copyFromLastWeek} disabled={!canEditAttendance} aria-disabled={!canEditAttendance}>
+          <button className="bulk-btn" onClick={copyFromLastWeek} disabled={!canEdit} aria-disabled={!canEdit}>
             <Copy size={16} />
             Copy from Last Week
           </button>
@@ -646,8 +856,8 @@ const YouthMinistryApp = () => {
                   <button
                     className={`attendance-btn ${hasRecord?.present === true ? 'present' : ''}`}
                     onClick={() => markAttendance(student.id, true)}
-                    disabled={!canEditAttendance}
-                    aria-disabled={!canEditAttendance}
+                    disabled={!canEdit}
+                    aria-disabled={!canEdit}
                   >
                     <CheckSquare size={18} />
                     Present
@@ -655,8 +865,8 @@ const YouthMinistryApp = () => {
                   <button
                     className={`attendance-btn ${hasRecord?.present === false ? 'absent' : ''}`}
                     onClick={() => markAttendance(student.id, false)}
-                    disabled={!canEditAttendance}
-                    aria-disabled={!canEditAttendance}
+                    disabled={!canEdit}
+                    aria-disabled={!canEdit}
                   >
                     <X size={18} />
                     Absent
@@ -725,7 +935,7 @@ const YouthMinistryApp = () => {
     const [localSelectedStudent, setLocalSelectedStudent] = useState(null);
 
     const handleCourseStatusChange = (studentId, courseId, newStatus) => {
-      if (!canEditCourses) return;
+      if (!canEdit) return;
       const existingProgress = courseProgress.find(
         cp => cp.studentId === studentId && cp.courseId === courseId
       );
@@ -761,7 +971,7 @@ const YouthMinistryApp = () => {
           <h1>Servants Preparation Program</h1>
         </div>
 
-        <ReadOnlyBanner permission="canManageCourses" />
+        {!canEdit && <ReadOnlyNotice />}
 
         <div className="prep-layout">
           <div className="students-sidebar">
@@ -805,7 +1015,7 @@ const YouthMinistryApp = () => {
                             course.id,
                             e.target.value
                           )}
-                          disabled={!canEditCourses}
+                          disabled={!canEdit}
                         >
                           <option value="not-started">Not Started</option>
                           <option value="in-progress">In Progress</option>
@@ -851,7 +1061,7 @@ const YouthMinistryApp = () => {
     ];
 
     const openRotationModal = (rotation = null) => {
-      if (!canEditRotations) return;
+      if (!canEdit) return;
       if (rotation) {
         setEditingRotation(rotation);
         setRotationForm({
@@ -873,7 +1083,7 @@ const YouthMinistryApp = () => {
     };
 
     const saveRotation = () => {
-      if (!canEditRotations) return;
+      if (!canEdit) return;
       if (!rotationForm.date || !rotationForm.serviceType || !rotationForm.volunteers) {
         alert('Please fill in all fields');
         return;
@@ -898,7 +1108,7 @@ const YouthMinistryApp = () => {
     };
 
     const deleteRotation = (id) => {
-      if (!canDeleteRecords) return;
+      if (!canDelete) return;
       if (confirm('Are you sure you want to delete this rotation?')) {
         setServiceRotations(serviceRotations.filter(r => r.id !== id));
       }
@@ -910,21 +1120,21 @@ const YouthMinistryApp = () => {
       <div className="content-section">
         <div className="section-header">
           <h1>Service Rotations</h1>
-          {canEditRotations && (
+          {canEdit && (
             <button className="btn-primary" onClick={() => openRotationModal()}>
               <Plus size={18} /> Add Rotation
             </button>
           )}
         </div>
 
-        <ReadOnlyBanner permission="canScheduleServices" />
+        {!canEdit && <ReadOnlyNotice />}
 
         <div className="rotation-list">
           {sortedRotations.length === 0 ? (
             <div className="empty-state">
               <Calendar size={48} />
               <p>No service rotations scheduled yet</p>
-              {canEditRotations && (
+              {canEdit && (
                 <button className="btn-primary" onClick={() => openRotationModal()}>
                   <Plus size={18} /> Schedule First Rotation
                 </button>
@@ -944,12 +1154,12 @@ const YouthMinistryApp = () => {
                     <p>{rotation.volunteers}</p>
                   </div>
                   <div className="rotation-actions">
-                    {canEditRotations && (
+                    {canEdit && (
                       <button className="icon-btn" onClick={() => openRotationModal(rotation)}>
                         <Edit2 size={16} />
                       </button>
                     )}
-                    {canDeleteRecords && (
+                    {canDelete && (
                       <button className="icon-btn danger" onClick={() => deleteRotation(rotation.id)}>
                         <Trash2 size={16} />
                       </button>
@@ -1033,7 +1243,7 @@ const YouthMinistryApp = () => {
     const [filterStatus, setFilterStatus] = useState('all');
 
     const openVisitModal = (visit = null) => {
-      if (!canEditVisitations) return;
+      if (!canEdit) return;
       if (visit) {
         setEditingVisit(visit);
         setVisitForm({
@@ -1072,7 +1282,7 @@ const YouthMinistryApp = () => {
     };
 
     const saveVisit = () => {
-      if (!canEditVisitations) return;
+      if (!canEdit) return;
       if (!visitForm.studentId || !visitForm.date || !visitForm.servants) {
         alert('Please fill in required fields (Student, Date, Servants)');
         return;
@@ -1097,14 +1307,14 @@ const YouthMinistryApp = () => {
     };
 
     const deleteVisit = (id) => {
-      if (!canDeleteRecords) return;
+      if (!canDelete) return;
       if (confirm('Are you sure you want to delete this visitation?')) {
         setVisitations(visitations.filter(v => v.id !== id));
       }
     };
 
     const toggleVisitCompleted = (id) => {
-      if (!canEditVisitations) return;
+      if (!canEdit) return;
       setVisitations(
         visitations.map(v =>
           v.id === id ? { ...v, completed: !v.completed } : v
@@ -1144,7 +1354,7 @@ const YouthMinistryApp = () => {
                 Completed ({visitations.filter(v => v.completed).length})
               </button>
             </div>
-            {canEditVisitations && (
+            {canEdit && (
               <button className="btn-primary" onClick={() => openVisitModal()}>
                 <Plus size={18} /> Schedule Visit
               </button>
@@ -1152,14 +1362,14 @@ const YouthMinistryApp = () => {
           </div>
         </div>
 
-        <ReadOnlyBanner permission="canManageVisitations" />
+        {!canEdit && <ReadOnlyNotice />}
 
         <div className="visitations-grid">
           {filteredVisitations.length === 0 ? (
             <div className="empty-state">
               <MapPin size={48} />
               <p>No visitations {filterStatus !== 'all' ? filterStatus : 'scheduled'} yet</p>
-              {canEditVisitations && (
+              {canEdit && (
                 <button className="btn-primary" onClick={() => openVisitModal()}>
                   <Plus size={18} /> Schedule First Visit
                 </button>
@@ -1206,7 +1416,7 @@ const YouthMinistryApp = () => {
                     )}
                   </div>
                   <div className="visitation-actions">
-                    {canEditVisitations && (
+                    {canEdit && (
                       <button
                         className={`btn-outline ${visit.completed ? 'completed' : ''}`}
                         onClick={() => toggleVisitCompleted(visit.id)}
@@ -1215,12 +1425,12 @@ const YouthMinistryApp = () => {
                         {visit.completed ? 'Mark Pending' : 'Mark Complete'}
                       </button>
                     )}
-                    {canEditVisitations && (
+                    {canEdit && (
                       <button className="icon-btn" onClick={() => openVisitModal(visit)}>
                         <Edit2 size={16} />
                       </button>
                     )}
-                    {canDeleteRecords && (
+                    {canDelete && (
                       <button className="icon-btn danger" onClick={() => deleteVisit(visit.id)}>
                         <Trash2 size={16} />
                       </button>
@@ -1340,14 +1550,14 @@ const YouthMinistryApp = () => {
           <button className="btn-outline" onClick={() => setCurrentView('students')}>
             ← Back to Students
           </button>
-          {canEditStudents && (
+          {canEdit && (
             <button className="btn-primary" onClick={() => setShowModal(true)}>
               <Edit2 size={18} /> Edit Student
             </button>
           )}
         </div>
 
-        <ReadOnlyBanner permission="canManageStudents" />
+        {!canEdit && <ReadOnlyNotice />}
 
         <div className="student-detail-container">
           {/* Student Profile Card */}
@@ -1529,7 +1739,6 @@ const YouthMinistryApp = () => {
     const [importErrors, setImportErrors] = useState([]);
 
     const handleFileSelect = (e) => {
-      if (!canImportData) return;
       const file = e.target.files[0];
       if (file && file.type === 'text/csv') {
         setCsvFile(file);
@@ -1572,7 +1781,6 @@ const YouthMinistryApp = () => {
     };
 
     const executeImport = () => {
-      if (!canImportData) return;
       if (importErrors.length > 0) {
         if (!confirm('There are validation errors. Continue anyway?')) {
           return;
@@ -1617,7 +1825,6 @@ const YouthMinistryApp = () => {
     };
 
     const exportData = (dataType) => {
-      if (!canExportData) return;
       let data, filename;
 
       if (dataType === 'students') {
@@ -1681,8 +1888,7 @@ const YouthMinistryApp = () => {
           <h1>Data Import & Export</h1>
         </div>
 
-        <ReadOnlyBanner permission="canImportData" />
-        {!canExportData && <ReadOnlyBanner permission="canExportData" />}
+        {!canImport && <ReadOnlyNotice message="Read-only access: imports are disabled for your role." />}
 
         <div className="import-export-container">
           {/* Export Section */}
@@ -1693,19 +1899,19 @@ const YouthMinistryApp = () => {
             <h2>Export Data</h2>
             <p>Download your data as CSV or JSON backup</p>
             <div className="export-buttons">
-              <button className="btn-outline" onClick={() => exportData('students')} disabled={!canExportData}>
+              <button className="btn-outline" onClick={() => exportData('students')}>
                 <Download size={16} />
                 Export Students (CSV)
               </button>
-              <button className="btn-outline" onClick={() => exportData('attendance')} disabled={!canExportData}>
+              <button className="btn-outline" onClick={() => exportData('attendance')}>
                 <Download size={16} />
                 Export Attendance (CSV)
               </button>
-              <button className="btn-outline" onClick={() => exportData('courseProgress')} disabled={!canExportData}>
+              <button className="btn-outline" onClick={() => exportData('courseProgress')}>
                 <Download size={16} />
                 Export Course Progress (CSV)
               </button>
-              <button className="btn-primary" onClick={() => exportData('all')} disabled={!canExportData}>
+              <button className="btn-primary" onClick={() => exportData('all')}>
                 <Download size={16} />
                 Full Backup (JSON)
               </button>
@@ -1713,7 +1919,7 @@ const YouthMinistryApp = () => {
           </div>
 
           {/* Import Section */}
-          {canImportData ? (
+          {canImport ? (
             <div className="import-export-card">
               <div className="card-icon">
                 <FileUp size={32} />
@@ -1835,7 +2041,7 @@ const YouthMinistryApp = () => {
 
   // Component: User Management (Admin only)
   const UserManagementView = () => {
-    const [users, setUsers] = useState(() => getAllUsers());
+    const [users, setUsers] = useState(() => readUsers());
     const [showUserModal, setShowUserModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [modalMode, setModalMode] = useState('create');
@@ -1851,7 +2057,7 @@ const YouthMinistryApp = () => {
     const [formError, setFormError] = useState('');
 
     useEffect(() => {
-      setUsers(getAllUsers());
+      setUsers(readUsers());
     }, []);
 
     const openUserModal = (user = null, mode = 'edit') => {
@@ -1906,13 +2112,21 @@ const YouthMinistryApp = () => {
           return;
         }
 
-        const result = await resetPassword(editingUser?.id, formData.password, currentUser?.id);
-        if (!result.success) {
-          setFormError(result.error || 'Password reset failed.');
-          return;
-        }
+        const passwordHash = await hashPassword(formData.password);
+        const nextUsers = users.map((user) => {
+          if (user.id !== editingUser?.id) return user;
+          return {
+            ...user,
+            passwordHash,
+            updatedAt: nowIso(),
+            failedAttempts: 0,
+            lockedUntil: null
+          };
+        });
 
-        setUsers(getAllUsers());
+        writeUsers(nextUsers);
+        setUsers(nextUsers);
+        logAudit('Password Reset', `Password reset for ${editingUser?.username}.`);
         closeUserModal();
         return;
       }
@@ -1922,9 +2136,9 @@ const YouthMinistryApp = () => {
         return;
       }
 
-      const normalized = formData.username.trim().toLowerCase();
-      const existingUser = users.find((user) => user.username === normalized);
-      if (existingUser && (!editingUser || existingUser.id !== editingUser.id)) {
+      const normalized = normalizeUsername(formData.username);
+      const existingIndex = users.findIndex((user) => user.username === normalized);
+      if (existingIndex !== -1 && (!editingUser || users[existingIndex].id !== editingUser.id)) {
         setFormError('That username is already in use.');
         return;
       }
@@ -1935,10 +2149,6 @@ const YouthMinistryApp = () => {
       }
 
       if (formData.password || formData.confirmPassword) {
-        if (editingUser) {
-          setFormError('Use "Reset Password" for password changes.');
-          return;
-        }
         if (formData.password.length < 8 || !/[0-9]/.test(formData.password) || !/[A-Za-z]/.test(formData.password)) {
           setFormError('Password must be at least 8 characters and include letters and numbers.');
           return;
@@ -1949,69 +2159,74 @@ const YouthMinistryApp = () => {
         }
       }
 
+      const nextUsers = [...users];
       if (editingUser) {
         if (editingUser.id === currentUser?.id && !formData.isActive) {
           setFormError('You cannot deactivate your own account.');
           return;
         }
-        const result = updateUser(
-          editingUser.id,
-          {
-            fullName: formData.fullName.trim(),
-            email: formData.email.trim(),
-            role: formData.role,
-            isActive: formData.isActive
-          },
-          currentUser?.id
-        );
-        if (!result.success) {
-          setFormError(result.error || 'User update failed.');
-          return;
+        const updatedUser = {
+          ...editingUser,
+          fullName: formData.fullName.trim(),
+          username: normalized,
+          email: formData.email.trim(),
+          role: formData.role,
+          isActive: formData.isActive,
+          updatedAt: nowIso()
+        };
+        if (formData.password) {
+          updatedUser.passwordHash = await hashPassword(formData.password);
         }
-        setUsers(getAllUsers());
+        nextUsers[existingIndex] = updatedUser;
+        writeUsers(nextUsers);
+        setUsers(nextUsers);
+        logAudit('User Updated', `Updated user ${updatedUser.username}.`);
       } else {
-        const result = await createUser(
-          {
-            username: normalized,
-            password: formData.password,
-            fullName: formData.fullName.trim(),
-            email: formData.email.trim(),
-            role: formData.role
-          },
-          currentUser?.id
-        );
-        if (!result.success) {
-          setFormError(result.error || 'User creation failed.');
-          return;
-        }
-        setUsers(getAllUsers());
+        const passwordHash = await hashPassword(formData.password);
+        const newUser = {
+          id: Date.now(),
+          username: normalized,
+          passwordHash,
+          fullName: formData.fullName.trim(),
+          email: formData.email.trim(),
+          role: formData.role,
+          isActive: formData.isActive,
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+          failedAttempts: 0,
+          lockedUntil: null
+        };
+        const updatedUsers = [...users, newUser];
+        writeUsers(updatedUsers);
+        setUsers(updatedUsers);
+        logAudit('User Created', `Created user ${newUser.username} (${newUser.role}).`);
       }
       closeUserModal();
     };
 
     const toggleUserActive = (user) => {
       if (user.id === currentUser?.id) return;
-      const result = updateUser(
-        user.id,
-        { isActive: !user.isActive },
-        currentUser?.id
+      const nextUsers = users.map((item) =>
+        item.id === user.id
+          ? { ...item, isActive: !item.isActive, updatedAt: nowIso() }
+          : item
       );
-      if (!result.success) {
-        alert(result.error || 'Unable to update user status.');
-        return;
-      }
-      setUsers(getAllUsers());
+      writeUsers(nextUsers);
+      setUsers(nextUsers);
+      logAudit('User Status', `User ${user.username} set to ${user.isActive ? 'inactive' : 'active'}.`);
     };
 
     const isLocked = (user) => user.lockedUntil && new Date(user.lockedUntil).getTime() > Date.now();
 
     const unlockUser = (user) => {
-      const result = unlockAccount(user.id, currentUser?.id);
-      if (!result.success) {
-        alert(result.error || 'Unable to unlock user.');
-        return;
-      }
-      setUsers(getAllUsers());
+      const nextUsers = users.map((item) => (
+        item.id === user.id
+          ? { ...item, failedAttempts: 0, lockedUntil: null, updatedAt: nowIso() }
+          : item
+      ));
+      writeUsers(nextUsers);
+      setUsers(nextUsers);
+      logAudit('User Unlock', `User ${user.username} unlocked.`);
     };
 
     if (!canManageUsers) {
@@ -2120,14 +2335,13 @@ const YouthMinistryApp = () => {
 
                     <div className="form-row">
                       <div className="form-group">
-                    <label>Username *</label>
-                    <input
-                      type="text"
-                      value={formData.username}
-                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                      disabled={Boolean(editingUser)}
-                      required
-                    />
+                        <label>Username *</label>
+                        <input
+                          type="text"
+                          value={formData.username}
+                          onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                          required
+                        />
                       </div>
                       <div className="form-group">
                         <label>Email</label>
@@ -2166,34 +2380,26 @@ const YouthMinistryApp = () => {
                   </>
                 )}
 
-                {modalMode === 'edit' && (
-                  <div className="form-hint">
-                    Use the reset password action to change user passwords.
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>{editingUser ? 'New Password' : 'Password *'}</label>
+                    <input
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      required={!editingUser || modalMode === 'reset'}
+                    />
                   </div>
-                )}
-
-                {modalMode !== 'edit' && (
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>{editingUser ? 'New Password' : 'Password *'}</label>
-                      <input
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        required={!editingUser || modalMode === 'reset'}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>{editingUser ? 'Confirm New Password' : 'Confirm Password *'}</label>
-                      <input
-                        type="password"
-                        value={formData.confirmPassword}
-                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                        required={!editingUser || modalMode === 'reset'}
-                      />
-                    </div>
+                  <div className="form-group">
+                    <label>{editingUser ? 'Confirm New Password' : 'Confirm Password *'}</label>
+                    <input
+                      type="password"
+                      value={formData.confirmPassword}
+                      onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                      required={!editingUser || modalMode === 'reset'}
+                    />
                   </div>
-                )}
+                </div>
 
                 {formError && <div className="auth-error">{formError}</div>}
 
@@ -2224,7 +2430,7 @@ const YouthMinistryApp = () => {
       }
     }, [currentView]);
 
-    if (!canViewAuditLog) {
+    if (!canManageUsers) {
       return (
         <div className="content-section">
           <div className="section-header">
@@ -2251,16 +2457,16 @@ const YouthMinistryApp = () => {
           </div>
         ) : (
           <div className="audit-list">
-            {entries.slice(0, 200).map((entry, index) => (
-              <div key={entry.id || `${entry.timestamp}-${index}`} className="audit-item">
+            {entries.slice(0, 200).map((entry) => (
+              <div key={entry.id} className="audit-item">
                 <div className="audit-meta">
                   <span className="audit-action">{entry.action}</span>
                   <span className="audit-time">
                     {new Date(entry.timestamp).toLocaleString()}
                   </span>
                 </div>
-                <div className="audit-detail">{entry.details || entry.detail || 'No details available'}</div>
-                <div className="audit-actor">By {entry.username || entry.actorName || 'System'}</div>
+                <div className="audit-detail">{entry.detail}</div>
+                <div className="audit-actor">By {entry.actorName || 'System'}</div>
               </div>
             ))}
           </div>
@@ -2509,6 +2715,223 @@ const YouthMinistryApp = () => {
     );
   };
 
+  const ReadOnlyNotice = ({ message = 'Read-only access: changes are disabled for your role.' }) => (
+    <div className="read-only-banner">
+      <AlertCircle size={16} />
+      <span>{message}</span>
+    </div>
+  );
+
+  const SetupWizard = () => {
+    const [formData, setFormData] = useState({
+      fullName: '',
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: ''
+    });
+    const [agree, setAgree] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+
+    const handleSubmit = (event) => {
+      event.preventDefault();
+      if (!agree) {
+        setAuthError('Please agree to the terms of use to continue.');
+        return;
+      }
+      handleSetup(formData);
+    };
+
+    return (
+      <div className="auth-shell">
+        <div className="auth-card">
+          <div className="auth-header">
+            <div className="auth-logo">YM</div>
+            <div>
+              <h1>Welcome to Youth Ministry</h1>
+              <p>Set up your admin account to begin.</p>
+            </div>
+          </div>
+
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>Full Name</label>
+              <input
+                type="text"
+                value={formData.fullName}
+                onChange={(e) => { setAuthError(''); setFormData({ ...formData, fullName: e.target.value }); }}
+                required
+              />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Username</label>
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => { setAuthError(''); setFormData({ ...formData, username: e.target.value }); }}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => { setAuthError(''); setFormData({ ...formData, email: e.target.value }); }}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group auth-password">
+                <label>Password</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={(e) => { setAuthError(''); setFormData({ ...formData, password: e.target.value }); }}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((value) => !value)}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="form-group auth-password">
+                <label>Confirm</label>
+                <input
+                  type={showConfirm ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={(e) => { setAuthError(''); setFormData({ ...formData, confirmPassword: e.target.value }); }}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowConfirm((value) => !value)}
+                >
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <label className="auth-checkbox">
+              <input
+                type="checkbox"
+                checked={agree}
+                onChange={(e) => setAgree(e.target.checked)}
+              />
+              I agree to the terms of use.
+            </label>
+
+            {authError && <div className="auth-error">{authError}</div>}
+
+            <button type="submit" className="btn-primary auth-submit" disabled={authBusy}>
+              {authBusy ? 'Setting up...' : 'Continue Setup'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const LoginScreen = () => {
+    const [credentials, setCredentials] = useState({ username: '', password: '', remember: false });
+    const [showPassword, setShowPassword] = useState(false);
+
+    const handleSubmit = (event) => {
+      event.preventDefault();
+      handleLogin(credentials);
+    };
+
+    return (
+      <div className="auth-shell">
+        <div className="auth-card">
+          <div className="auth-header">
+            <div className="auth-logo">YM</div>
+            <div>
+              <h1>Youth Ministry System</h1>
+              <p>HS 2025-2026</p>
+            </div>
+          </div>
+
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>Username</label>
+              <input
+                type="text"
+                value={credentials.username}
+                onChange={(e) => { setAuthError(''); setCredentials({ ...credentials, username: e.target.value }); }}
+                required
+              />
+            </div>
+
+            <div className="form-group auth-password">
+              <label>Password</label>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={credentials.password}
+                onChange={(e) => { setAuthError(''); setCredentials({ ...credentials, password: e.target.value }); }}
+                required
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword((value) => !value)}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+
+            <label className="auth-checkbox">
+              <input
+                type="checkbox"
+                checked={credentials.remember}
+                onChange={(e) => setCredentials({ ...credentials, remember: e.target.checked })}
+              />
+              Remember me
+            </label>
+
+            {authError && <div className="auth-error">{authError}</div>}
+
+            <button type="submit" className="btn-primary auth-submit" disabled={authBusy}>
+              {authBusy ? 'Signing in...' : 'Login'}
+            </button>
+          </form>
+
+          <div className="auth-footer">
+            <span>Forgot password? Contact an admin.</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Main render
+  if (authMode === 'loading') {
+    return (
+      <div className="auth-shell">
+        <div className="auth-card auth-loading">
+          <div className="spinner" />
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authMode === 'setup') {
+    return <SetupWizard />;
+  }
+
+  if (authMode === 'login') {
+    return <LoginScreen />;
+  }
+
   return (
     <div className="app-container">
       <aside className="sidebar">
@@ -2590,7 +3013,7 @@ const YouthMinistryApp = () => {
             </button>
           )}
 
-          {canViewAuditLog && (
+          {canManageUsers && (
             <button
               className={`nav-item ${currentView === 'audit' ? 'active' : ''}`}
               onClick={() => setCurrentView('audit')}
@@ -2614,7 +3037,7 @@ const YouthMinistryApp = () => {
             <Settings size={20} />
             <span>Settings</span>
           </button>
-          <button className="nav-item" onClick={logout}>
+          <button className="nav-item" onClick={handleLogout}>
             <LogOut size={20} />
             <span>Logout</span>
           </button>
