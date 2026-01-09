@@ -8,31 +8,65 @@ This application digitizes and streamlines the management of your High School Yo
 
 ## ✨ Features
 
-### 1. **Dashboard**
-- Real-time statistics (Active Students, Graduates, Attendance, Pending Visits)
-- Recent activity feed
+### 1. **Enhanced Dashboard**
+- Real-time statistics with live data
+  - Active Students with grade distribution breakdown
+  - Graduates count
+  - Real-time attendance percentage calculation
+  - Pending visits counter with completed visitations
+- Recent activity feed from actual data
+  - Latest attendance sessions
+  - Recently added students
+  - Completed visitations
 - Quick action buttons for common tasks
-- Visual analytics at a glance
+  - Mark Attendance
+  - Add Student
+  - Schedule Visit
+  - Import/Export Data
 
-### 2. **Student Management**
-- Complete student profiles with contact information
-- Parent contact details
-- Grade tracking
-- Responsible servant assignment
-- Search and filter capabilities
-- CRUD operations (Create, Read, Update, Delete)
-- Student status tracking (Active, Graduate, Transferred)
+### 2. **Comprehensive Student Management**
+- **Complete Profiles**:
+  - Full name, grade, date of birth
+  - Contact information (phone, email)
+  - Responsible servant assignment
+  - Student status (Active, Graduate, Transferred)
+- **Parent Information**:
+  - Parent 1 & 2 contact details (name, phone, email)
+- **Address Information**:
+  - Full address, city, zipcode
+- **Student Detail View**:
+  - Comprehensive profile display
+  - Full attendance history with percentages
+  - Course progress overview
+  - Parent contact cards
+  - Edit capabilities
+- **Management Features**:
+  - Search and filter by name or grade
+  - CRUD operations (Create, Read, Update, Delete)
+  - Status badges (color-coded)
+  - Quick access to edit/delete/view details
 
-### 3. **Attendance Tracking**
-- Digital attendance marking for Friday/Saturday services
-- Date-based attendance records
-- Real-time attendance marking
-- Present/Absent tracking
-- Historical attendance data
-- Attendance reports per student
+### 3. **Advanced Attendance Tracking**
+- **Digital Attendance Marking**:
+  - Friday/Saturday service selection
+  - Date picker for any session
+  - Individual Present/Absent marking
+- **Bulk Operations**:
+  - Mark All Present
+  - Mark All Absent
+  - Copy from Last Week
+- **Attendance History**:
+  - Statistics dashboard (total sessions, present/absent counts)
+  - Timeline view of last 10 sessions
+  - Color-coded percentages (green ≥80%, yellow ≥60%, red <60%)
+  - Session-by-session breakdown
+- **Real Calculations**:
+  - Live attendance percentage on dashboard
+  - Per-student attendance tracking
+  - Historical records with date filtering
 
 ### 4. **Servants Preparation Program**
-- Track student progress through 10 core courses:
+- **10 Core Courses Tracked**:
   - Dogma 1 & 2
   - Spirituality
   - Liturgical Studies
@@ -42,28 +76,79 @@ This application digitizes and streamlines the management of your High School Yo
   - Old Testament
   - Church History
   - Comparative Religion
-- Course status tracking (Not Started, In Progress, Completed, Passed)
-- Service hours logging
-- Graduate tracking
+- **Progress Tracking**:
+  - Course status: Not Started, In Progress, Completed, Passed
+  - Per-student progress view
+  - Visual progress indicators
+  - Persistent storage (survives page refresh)
+- **Integration**:
+  - Displayed in Student Detail view
+  - Automatic save on status change
 
-### 5. **Service Rotations**
-- Schedule and manage service assignments
-- Calendar view of rotations
-- Multiple service types (Altar Service, Ushers, etc.)
-- Volunteer assignment tracking
+### 5. **Service Rotations Management**
+- **Full CRUD Operations**:
+  - Create new rotations
+  - Edit existing rotations
+  - Delete rotations with confirmation
+- **8 Service Types**:
+  - Altar Service
+  - Ushers
+  - Hymns/Praise
+  - Readings
+  - Offering
+  - Multimedia
+  - Cleaning
+  - Setup/Teardown
+- **Features**:
+  - Date-based scheduling
+  - Volunteer assignment (comma-separated names)
+  - Sorted by date (most recent first)
+  - Modal-based editing
+  - Empty state with call-to-action
 
-### 6. **Visitations**
-- Visitation planning and scheduling
-- Track visit status (Pending, Completed)
-- Visitation groups management
-- Notes and follow-up tracking
-- Address and contact information
+### 6. **Visitations Scheduling & Tracking**
+- **Full Management**:
+  - Schedule new visits
+  - Edit existing visits
+  - Delete visits with confirmation
+  - Toggle completion status
+- **Filter System**:
+  - View All visitations
+  - Filter by Pending
+  - Filter by Completed
+- **Detailed Information**:
+  - Student assignment
+  - Visit date
+  - Servants assigned
+  - Group size
+  - Notes
+  - Student address (when available)
+- **Status Tracking**:
+  - Pending vs Completed badges
+  - Quick status toggle
+  - Completion count in dashboard
 
-### 7. **Reports & Analytics**
-- Generate attendance reports
-- Export data functionality
-- Progress tracking reports
-- Statistical analysis
+### 7. **Data Import/Export System**
+- **Export Capabilities**:
+  - Export Students (CSV)
+  - Export Attendance (CSV)
+  - Export Course Progress (CSV)
+  - Full Backup (JSON) - all data included
+- **Import Features**:
+  - CSV file upload with drag-and-drop
+  - Real-time data validation
+  - Preview table (first 10 records)
+  - Error reporting with detailed messages
+  - Support for all 17 student fields
+- **CSV Format**:
+  - Required: firstName, lastName, grade
+  - Optional: phone, email, dob, responsibleServant, status, parent info, address
+  - Grade validation: 9th, 10th, 11th, or 12th
+- **User-Friendly**:
+  - Step-by-step wizard
+  - Validation errors displayed
+  - Confirmation before import
+  - Success notifications
 
 ## 🎨 Design Features
 
@@ -76,30 +161,34 @@ This application digitizes and streamlines the management of your High School Yo
 
 ## 🚀 Getting Started
 
-### Option 1: Simple Local Deployment
-
-1. Download all files to a folder
-2. Open `index.html` in a modern web browser (Chrome, Firefox, Safari, Edge)
-3. Start using the application immediately
-
-### Option 2: Development Setup
+### Development Setup
 
 ```bash
-# Create a new React project
-npx create-react-app youth-ministry-system
-cd youth-ministry-system
+# Clone or download the repository
+cd Class-Management-System
 
-# Copy the component file
-# Replace src/App.js with youth-ministry-app.jsx content
+# Install dependencies
+npm install
 
-# Install dependencies (if needed)
-npm install lucide-react
+# Start the development server (runs on port 8080)
+npm run dev
 
-# Start the development server
-npm start
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
 ```
 
-### Option 3: Production Deployment
+### Dependencies
+
+The application uses:
+- **React 18.3.1** - UI framework
+- **Vite 7.3.1** - Build tool and dev server
+- **Lucide React 0.294.0** - Icon library
+- **PapaParse 5.5.3** - CSV parsing for data import
+
+### Production Deployment
 
 **Deploy to Vercel (Recommended):**
 ```bash
@@ -110,7 +199,7 @@ vercel
 **Deploy to Netlify:**
 1. Connect your GitHub repository
 2. Build command: `npm run build`
-3. Publish directory: `build`
+3. Publish directory: `dist`
 
 ## 📊 Data Structure
 
@@ -120,12 +209,23 @@ vercel
   id: number,
   firstName: string,
   lastName: string,
-  grade: string,
+  grade: '9th' | '10th' | '11th' | '12th',
   phone: string,
   email: string,
   dob: string,
   responsibleServant: string,
-  status: string // 'Active' | 'Graduate' | 'Transferred'
+  status: 'Active' | 'Graduate' | 'Transferred',
+  // Parent Information
+  parent1Name: string,
+  parent1Phone: string,
+  parent1Email: string,
+  parent2Name: string,
+  parent2Phone: string,
+  parent2Email: string,
+  // Address Information
+  address: string,
+  city: string,
+  zipcode: string
 }
 ```
 
@@ -134,9 +234,9 @@ vercel
 {
   id: number,
   studentId: number,
-  date: string,
+  date: string, // ISO date format
   present: boolean,
-  day: string // 'Friday' | 'Saturday'
+  day: string // Weekday name
 }
 ```
 
@@ -145,7 +245,30 @@ vercel
 {
   studentId: number,
   courseId: number,
-  status: string // 'not-started' | 'in-progress' | 'completed' | 'passed'
+  status: 'not-started' | 'in-progress' | 'completed' | 'passed'
+}
+```
+
+### Service Rotations
+```javascript
+{
+  id: number,
+  date: string, // ISO date format
+  serviceType: string, // One of 8 service types
+  volunteers: string // Comma-separated names
+}
+```
+
+### Visitations
+```javascript
+{
+  id: number,
+  studentId: number,
+  date: string, // ISO date format
+  servants: string,
+  groupSize: string,
+  notes: string,
+  completed: boolean
 }
 ```
 
@@ -211,24 +334,45 @@ The application is fully responsive with breakpoints at:
 
 ## 🗄️ Data Migration from Excel
 
-To migrate your existing Excel data:
+The application includes a built-in **Import/Export system**:
 
-1. **Export each sheet to CSV**
-2. **Create a data import script**:
-```javascript
-// Example: Import students from CSV
-function importStudents(csvData) {
-  const students = csvData.map(row => ({
-    firstName: row['First Name'],
-    lastName: row['Last Name'],
-    grade: row['Grade'],
-    // ... map other fields
-  }));
-  setStudents(students);
-}
-```
+### Importing Data:
 
-3. **Use the provided data structure** to maintain consistency
+1. **Navigate to Import/Export**:
+   - Click "Import/Export" in the sidebar
+
+2. **Export Excel to CSV**:
+   - Open your Excel file (e.g., "HS 2025-2026.xlsx")
+   - Export "Class 2526" sheet to CSV
+
+3. **Import via UI**:
+   - Select "Students" import type
+   - Click to upload CSV file or drag-and-drop
+   - Review the preview (first 10 records shown)
+   - Check for validation errors
+   - Click "Import" to complete
+
+### CSV Format Requirements:
+
+**Required Columns:**
+- `firstName`
+- `lastName`
+- `grade` (must be: 9th, 10th, 11th, or 12th)
+
+**Optional Columns:**
+- `phone`, `email`, `dob`
+- `responsibleServant`
+- `status` (Active, Graduate, Transferred)
+- `parent1Name`, `parent1Phone`, `parent1Email`
+- `parent2Name`, `parent2Phone`, `parent2Email`
+- `address`, `city`, `zipcode`
+
+### Exporting Data:
+
+- **Students CSV**: All student information
+- **Attendance CSV**: All attendance records with student names
+- **Course Progress CSV**: Student course completion status
+- **Full Backup JSON**: Complete data backup (all tables)
 
 ## 🆘 Support & Documentation
 
@@ -265,11 +409,14 @@ function importStudents(csvData) {
 
 ## 📝 Technical Stack
 
-- **Frontend**: React 18
-- **Icons**: Lucide React
-- **Styling**: CSS-in-JS
-- **State Management**: React Hooks (useState)
-- **Data Storage**: LocalStorage (can be upgraded to database)
+- **Frontend**: React 18.3.1
+- **Build Tool**: Vite 7.3.1
+- **Icons**: Lucide React 0.294.0
+- **CSV Parsing**: PapaParse 5.5.3
+- **Styling**: CSS3 with CSS Variables
+- **State Management**: React Hooks (useState, useEffect)
+- **Data Storage**: LocalStorage with custom hooks
+- **Module System**: ES6 Modules
 
 ## 🤝 Contributing
 
@@ -291,6 +438,19 @@ Built with care for effective youth ministry management. May this tool help you 
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: January 2026  
+**Version**: 1.0.0
+**Last Updated**: January 2026
 **Maintained by**: Youth Ministry Team
+
+## 🎯 Key Features Summary
+
+✅ **Full LocalStorage Persistence** - All data saves automatically
+✅ **Student Management** - Complete profiles with parent & address info
+✅ **Attendance Tracking** - Bulk operations, history view, real-time stats
+✅ **Course Progress** - 10 Servants Prep courses with persistent tracking
+✅ **Service Rotations** - Full CRUD with 8 service types
+✅ **Visitations** - Scheduling, tracking, and completion management
+✅ **Import/Export** - CSV import with validation, multiple export formats
+✅ **Enhanced Dashboard** - Live stats, grade distribution, recent activity
+✅ **Student Detail View** - Comprehensive profile with attendance & progress
+✅ **Professional UI** - Church-appropriate design with smooth animations

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, BookOpen, CheckSquare, MapPin, UserCheck, Settings, Home, Bell, Search, Download, Upload, Plus, Edit2, Trash2, Eye, Filter, X, Save, ChevronDown, ChevronRight, Clock, Mail, Phone, Award, Activity } from 'lucide-react';
+import { Calendar, Users, BookOpen, CheckSquare, MapPin, UserCheck, Settings, Home, Bell, Search, Download, Upload, Plus, Edit2, Trash2, Eye, Filter, X, Save, ChevronDown, ChevronRight, Clock, Mail, Phone, Award, Activity, Copy, FileUp, FileDown, AlertCircle } from 'lucide-react';
+import Papa from 'papaparse';
 import './App.css';
 
 // Custom hook for localStorage persistence
@@ -159,10 +160,28 @@ const YouthMinistryApp = () => {
   const [courseProgress, setCourseProgress] = useLocalStorage('yms_courseProgress', []);
 
   // Calculate statistics
+  const calculateAttendancePercentage = () => {
+    const activeStudents = students.filter(s => s.status === 'Active');
+    if (activeStudents.length === 0 || attendance.length === 0) return 0;
+
+    // Get unique dates to calculate attendance per session
+    const uniqueDates = [...new Set(attendance.map(a => a.date))];
+    if (uniqueDates.length === 0) return 0;
+
+    // Calculate attendance percentage across all sessions
+    const totalPossibleAttendances = activeStudents.length * uniqueDates.length;
+    const actualAttendances = attendance.filter(a => {
+      const student = students.find(s => s.id === a.studentId);
+      return student && student.status === 'Active' && a.present;
+    }).length;
+
+    return Math.round((actualAttendances / totalPossibleAttendances) * 100);
+  };
+
   const stats = {
     totalStudents: students.filter(s => s.status === 'Active').length,
     totalGraduates: students.filter(s => s.status === 'Graduate').length,
-    averageAttendance: 0,
+    averageAttendance: calculateAttendancePercentage(),
     upcomingVisits: visitations.filter(v => !v.completed).length,
   };
 
@@ -204,84 +223,152 @@ const YouthMinistryApp = () => {
   };
 
   // Component: Dashboard
-  const Dashboard = () => (
-    <div className="dashboard-grid">
-      <div className="stat-card stat-primary">
-        <div className="stat-icon"><Users size={32} /></div>
-        <div className="stat-content">
-          <div className="stat-label">Active Students</div>
-          <div className="stat-value">{stats.totalStudents}</div>
-        </div>
-      </div>
-      
-      <div className="stat-card stat-secondary">
-        <div className="stat-icon"><Award size={32} /></div>
-        <div className="stat-content">
-          <div className="stat-label">Graduates</div>
-          <div className="stat-value">{stats.totalGraduates}</div>
-        </div>
-      </div>
-      
-      <div className="stat-card stat-accent">
-        <div className="stat-icon"><Activity size={32} /></div>
-        <div className="stat-content">
-          <div className="stat-label">Avg Attendance</div>
-          <div className="stat-value">78%</div>
-        </div>
-      </div>
-      
-      <div className="stat-card stat-warning">
-        <div className="stat-icon"><MapPin size={32} /></div>
-        <div className="stat-content">
-          <div className="stat-label">Pending Visits</div>
-          <div className="stat-value">{stats.upcomingVisits}</div>
-        </div>
-      </div>
+  const Dashboard = () => {
+    // Grade distribution
+    const gradeDistribution = {
+      '9th': students.filter(s => s.status === 'Active' && s.grade === '9th').length,
+      '10th': students.filter(s => s.status === 'Active' && s.grade === '10th').length,
+      '11th': students.filter(s => s.status === 'Active' && s.grade === '11th').length,
+      '12th': students.filter(s => s.status === 'Active' && s.grade === '12th').length,
+    };
 
-      <div className="dashboard-section recent-activity">
-        <h2>Recent Activity</h2>
-        <div className="activity-list">
-          <div className="activity-item">
-            <Clock size={16} />
-            <span>Attendance marked for Friday service</span>
-            <span className="activity-time">2 hours ago</span>
-          </div>
-          <div className="activity-item">
-            <Users size={16} />
-            <span>New student added: John Doe</span>
-            <span className="activity-time">1 day ago</span>
-          </div>
-          <div className="activity-item">
-            <MapPin size={16} />
-            <span>Visitation completed: Smith Family</span>
-            <span className="activity-time">2 days ago</span>
-          </div>
-        </div>
-      </div>
+    // Recent activities from actual data
+    const recentActivities = [];
 
-      <div className="dashboard-section quick-actions">
-        <h2>Quick Actions</h2>
-        <div className="action-buttons">
-          <button className="action-btn" onClick={() => setCurrentView('attendance')}>
-            <CheckSquare size={20} />
-            Mark Attendance
-          </button>
-          <button className="action-btn" onClick={() => { setShowModal(true); setSelectedStudent(null); }}>
-            <Plus size={20} />
-            Add Student
-          </button>
-          <button className="action-btn" onClick={() => setCurrentView('visitations')}>
-            <MapPin size={20} />
-            Schedule Visit
-          </button>
-          <button className="action-btn" onClick={() => setCurrentView('reports')}>
-            <Download size={20} />
-            Generate Report
-          </button>
+    // Recent attendance sessions
+    const uniqueDates = [...new Set(attendance.map(a => a.date))].sort((a, b) => new Date(b) - new Date(a));
+    if (uniqueDates.length > 0) {
+      const latestDate = uniqueDates[0];
+      const dayName = new Date(latestDate).toLocaleDateString('en-US', { weekday: 'long' });
+      recentActivities.push({
+        icon: CheckSquare,
+        text: `Attendance marked for ${dayName}`,
+        time: formatRelativeTime(latestDate)
+      });
+    }
+
+    // Recent students
+    const recentStudents = [...students].sort((a, b) => b.id - a.id).slice(0, 1);
+    if (recentStudents.length > 0) {
+      recentActivities.push({
+        icon: Users,
+        text: `Student added: ${recentStudents[0].firstName} ${recentStudents[0].lastName}`,
+        time: 'Recently'
+      });
+    }
+
+    // Recent completed visitations
+    const completedVisits = visitations.filter(v => v.completed).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 1);
+    if (completedVisits.length > 0) {
+      const student = students.find(s => s.id === completedVisits[0].studentId);
+      if (student) {
+        recentActivities.push({
+          icon: MapPin,
+          text: `Visitation completed: ${student.firstName} ${student.lastName}`,
+          time: formatRelativeTime(completedVisits[0].date)
+        });
+      }
+    }
+
+    function formatRelativeTime(dateStr) {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return `${diffDays} days ago`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+      return date.toLocaleDateString();
+    }
+
+    return (
+      <div className="dashboard-grid">
+        <div className="stat-card stat-primary">
+          <div className="stat-icon"><Users size={32} /></div>
+          <div className="stat-content">
+            <div className="stat-label">Active Students</div>
+            <div className="stat-value">{stats.totalStudents}</div>
+            <div className="stat-detail">
+              {Object.entries(gradeDistribution).map(([grade, count]) => (
+                count > 0 && <span key={grade}>{grade}: {count}</span>
+              )).filter(Boolean).slice(0, 2).reduce((prev, curr) => [prev, ' • ', curr])}
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card stat-secondary">
+          <div className="stat-icon"><Award size={32} /></div>
+          <div className="stat-content">
+            <div className="stat-label">Graduates</div>
+            <div className="stat-value">{stats.totalGraduates}</div>
+            <div className="stat-detail">This year</div>
+          </div>
+        </div>
+
+        <div className="stat-card stat-accent">
+          <div className="stat-icon"><Activity size={32} /></div>
+          <div className="stat-content">
+            <div className="stat-label">Avg Attendance</div>
+            <div className="stat-value">{stats.averageAttendance}%</div>
+            <div className="stat-detail">{uniqueDates.length} sessions tracked</div>
+          </div>
+        </div>
+
+        <div className="stat-card stat-warning">
+          <div className="stat-icon"><MapPin size={32} /></div>
+          <div className="stat-content">
+            <div className="stat-label">Pending Visits</div>
+            <div className="stat-value">{stats.upcomingVisits}</div>
+            <div className="stat-detail">{visitations.filter(v => v.completed).length} completed</div>
+          </div>
+        </div>
+
+        <div className="dashboard-section recent-activity">
+          <h2>Recent Activity</h2>
+          <div className="activity-list">
+            {recentActivities.length > 0 ? (
+              recentActivities.map((activity, index) => (
+                <div key={index} className="activity-item">
+                  <activity.icon size={16} />
+                  <span>{activity.text}</span>
+                  <span className="activity-time">{activity.time}</span>
+                </div>
+              ))
+            ) : (
+              <div className="empty-activity">
+                <Clock size={32} />
+                <p>No recent activity</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="dashboard-section quick-actions">
+          <h2>Quick Actions</h2>
+          <div className="action-buttons">
+            <button className="action-btn" onClick={() => setCurrentView('attendance')}>
+              <CheckSquare size={20} />
+              Mark Attendance
+            </button>
+            <button className="action-btn" onClick={() => { setShowModal(true); setSelectedStudent(null); }}>
+              <Plus size={20} />
+              Add Student
+            </button>
+            <button className="action-btn" onClick={() => setCurrentView('visitations')}>
+              <MapPin size={20} />
+              Schedule Visit
+            </button>
+            <button className="action-btn" onClick={() => setCurrentView('import')}>
+              <Upload size={20} />
+              Import/Export Data
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Component: Students Management
   const StudentsView = () => (
@@ -384,6 +471,72 @@ const YouthMinistryApp = () => {
     const [selectedDay, setSelectedDay] = useState('Friday');
     const todayAttendance = attendance.filter(a => a.date === attendanceDate);
 
+    const markAllPresent = () => {
+      const activeStudents = students.filter(s => s.status === 'Active');
+      const newRecords = activeStudents
+        .filter(student => !todayAttendance.find(a => a.studentId === student.id))
+        .map(student => ({
+          id: Date.now() + student.id,
+          studentId: student.id,
+          date: attendanceDate,
+          present: true,
+          day: new Date(attendanceDate).toLocaleDateString('en-US', { weekday: 'short' })
+        }));
+
+      // Update existing records to present
+      const updatedAttendance = attendance.map(a =>
+        a.date === attendanceDate ? { ...a, present: true } : a
+      );
+
+      setAttendance([...updatedAttendance, ...newRecords]);
+    };
+
+    const markAllAbsent = () => {
+      const activeStudents = students.filter(s => s.status === 'Active');
+      const newRecords = activeStudents
+        .filter(student => !todayAttendance.find(a => a.studentId === student.id))
+        .map(student => ({
+          id: Date.now() + student.id,
+          studentId: student.id,
+          date: attendanceDate,
+          present: false,
+          day: new Date(attendanceDate).toLocaleDateString('en-US', { weekday: 'short' })
+        }));
+
+      // Update existing records to absent
+      const updatedAttendance = attendance.map(a =>
+        a.date === attendanceDate ? { ...a, present: false } : a
+      );
+
+      setAttendance([...updatedAttendance, ...newRecords]);
+    };
+
+    const copyFromLastWeek = () => {
+      const selectedDate = new Date(attendanceDate);
+      const lastWeekDate = new Date(selectedDate);
+      lastWeekDate.setDate(lastWeekDate.getDate() - 7);
+      const lastWeekDateStr = lastWeekDate.toISOString().split('T')[0];
+
+      const lastWeekAttendance = attendance.filter(a => a.date === lastWeekDateStr);
+
+      if (lastWeekAttendance.length === 0) {
+        alert('No attendance records found for last week on this date.');
+        return;
+      }
+
+      const newRecords = lastWeekAttendance.map(record => ({
+        id: Date.now() + record.studentId,
+        studentId: record.studentId,
+        date: attendanceDate,
+        present: record.present,
+        day: new Date(attendanceDate).toLocaleDateString('en-US', { weekday: 'short' })
+      }));
+
+      // Remove existing records for today and add copied ones
+      const filteredAttendance = attendance.filter(a => a.date !== attendanceDate);
+      setAttendance([...filteredAttendance, ...newRecords]);
+    };
+
     return (
       <div className="content-section">
         <div className="section-header">
@@ -410,6 +563,21 @@ const YouthMinistryApp = () => {
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="bulk-actions">
+          <button className="bulk-btn" onClick={markAllPresent}>
+            <CheckSquare size={16} />
+            Mark All Present
+          </button>
+          <button className="bulk-btn" onClick={markAllAbsent}>
+            <X size={16} />
+            Mark All Absent
+          </button>
+          <button className="bulk-btn" onClick={copyFromLastWeek}>
+            <Copy size={16} />
+            Copy from Last Week
+          </button>
         </div>
 
         <div className="attendance-list">
@@ -447,14 +615,93 @@ const YouthMinistryApp = () => {
             );
           })}
         </div>
+
+        <div className="attendance-history-section">
+          <h2>Attendance History</h2>
+          <div className="history-stats">
+            <div className="history-stat-card">
+              <div className="stat-value">{[...new Set(attendance.map(a => a.date))].length}</div>
+              <div className="stat-label">Total Sessions</div>
+            </div>
+            <div className="history-stat-card">
+              <div className="stat-value">{attendance.filter(a => a.present).length}</div>
+              <div className="stat-label">Total Present</div>
+            </div>
+            <div className="history-stat-card">
+              <div className="stat-value">{attendance.filter(a => !a.present).length}</div>
+              <div className="stat-label">Total Absent</div>
+            </div>
+          </div>
+
+          <div className="history-timeline">
+            {[...new Set(attendance.map(a => a.date))]
+              .sort((a, b) => new Date(b) - new Date(a))
+              .slice(0, 10)
+              .map(date => {
+                const sessionAttendance = attendance.filter(a => a.date === date);
+                const presentCount = sessionAttendance.filter(a => a.present).length;
+                const totalCount = sessionAttendance.length;
+                const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
+
+                return (
+                  <div key={date} className="history-session">
+                    <div className="session-date">
+                      <Calendar size={16} />
+                      <span>{new Date(date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                    </div>
+                    <div className="session-stats">
+                      <div className="session-count">
+                        <span className="present-count">{presentCount} present</span>
+                        <span className="absent-count">{totalCount - presentCount} absent</span>
+                      </div>
+                      <div className="session-percentage" style={{
+                        color: percentage >= 80 ? 'var(--success)' : percentage >= 60 ? 'var(--warning)' : 'var(--danger)'
+                      }}>
+                        {percentage}%
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
       </div>
     );
   };
 
   // Component: Servants Prep
   const ServantsPrep = () => {
-    const [selectedStudent, setLocalStudent] = useState(null);
-    const [courseProgress, setCourseProgress] = useState({});
+    const [localSelectedStudent, setLocalSelectedStudent] = useState(null);
+
+    const handleCourseStatusChange = (studentId, courseId, newStatus) => {
+      const existingProgress = courseProgress.find(
+        cp => cp.studentId === studentId && cp.courseId === courseId
+      );
+
+      if (existingProgress) {
+        // Update existing progress
+        setCourseProgress(
+          courseProgress.map(cp =>
+            cp.studentId === studentId && cp.courseId === courseId
+              ? { ...cp, status: newStatus }
+              : cp
+          )
+        );
+      } else {
+        // Add new progress
+        setCourseProgress([
+          ...courseProgress,
+          { studentId, courseId, status: newStatus }
+        ]);
+      }
+    };
+
+    const getCourseStatus = (studentId, courseId) => {
+      const progress = courseProgress.find(
+        cp => cp.studentId === studentId && cp.courseId === courseId
+      );
+      return progress?.status || 'not-started';
+    };
 
     return (
       <div className="content-section">
@@ -468,8 +715,8 @@ const YouthMinistryApp = () => {
             {students.filter(s => s.status === 'Active').map(student => (
               <div
                 key={student.id}
-                className={`sidebar-student ${selectedStudent?.id === student.id ? 'active' : ''}`}
-                onClick={() => setLocalStudent(student)}
+                className={`sidebar-student ${localSelectedStudent?.id === student.id ? 'active' : ''}`}
+                onClick={() => setLocalSelectedStudent(student)}
               >
                 <div className="student-avatar-sm">
                   {student.firstName[0]}{student.lastName[0]}
@@ -480,28 +727,39 @@ const YouthMinistryApp = () => {
           </div>
 
           <div className="courses-content">
-            {selectedStudent ? (
+            {localSelectedStudent ? (
               <>
                 <div className="selected-student-header">
-                  <h2>{selectedStudent.firstName} {selectedStudent.lastName}</h2>
+                  <h2>{localSelectedStudent.firstName} {localSelectedStudent.lastName}</h2>
                   <p>Servants Preparation Progress</p>
                 </div>
-                
+
                 <div className="courses-grid">
-                  {initialCourses.map(course => (
-                    <div key={course.id} className="course-card">
-                      <div className="course-header">
-                        <h3>{course.name}</h3>
-                        <span className="course-category">{course.category}</span>
+                  {initialCourses.map(course => {
+                    const currentStatus = getCourseStatus(localSelectedStudent.id, course.id);
+                    return (
+                      <div key={course.id} className="course-card">
+                        <div className="course-header">
+                          <h3>{course.name}</h3>
+                          <span className="course-category">{course.category}</span>
+                        </div>
+                        <select
+                          className="course-status-select"
+                          value={currentStatus}
+                          onChange={(e) => handleCourseStatusChange(
+                            localSelectedStudent.id,
+                            course.id,
+                            e.target.value
+                          )}
+                        >
+                          <option value="not-started">Not Started</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                          <option value="passed">Passed</option>
+                        </select>
                       </div>
-                      <select className="course-status-select">
-                        <option value="not-started">Not Started</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="passed">Passed</option>
-                      </select>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             ) : (
@@ -517,78 +775,959 @@ const YouthMinistryApp = () => {
   };
 
   // Component: Service Rotations
-  const ServiceRotationsView = () => (
-    <div className="content-section">
-      <div className="section-header">
-        <h1>Service Rotations</h1>
-        <button className="btn-primary">
-          <Plus size={18} /> Add Rotation
-        </button>
-      </div>
-      
-      <div className="rotations-calendar">
-        <div className="calendar-header">
-          <h3>October 2025</h3>
+  const ServiceRotationsView = () => {
+    const [showRotationModal, setShowRotationModal] = useState(false);
+    const [editingRotation, setEditingRotation] = useState(null);
+    const [rotationForm, setRotationForm] = useState({
+      date: '',
+      serviceType: '',
+      volunteers: '',
+    });
+
+    const serviceTypes = [
+      'Altar Service',
+      'Ushers',
+      'Hymns/Praise',
+      'Readings',
+      'Offering',
+      'Multimedia',
+      'Cleaning',
+      'Setup/Teardown'
+    ];
+
+    const openRotationModal = (rotation = null) => {
+      if (rotation) {
+        setEditingRotation(rotation);
+        setRotationForm({
+          date: rotation.date,
+          serviceType: rotation.serviceType,
+          volunteers: rotation.volunteers,
+        });
+      } else {
+        setEditingRotation(null);
+        setRotationForm({ date: '', serviceType: '', volunteers: '' });
+      }
+      setShowRotationModal(true);
+    };
+
+    const closeRotationModal = () => {
+      setShowRotationModal(false);
+      setEditingRotation(null);
+      setRotationForm({ date: '', serviceType: '', volunteers: '' });
+    };
+
+    const saveRotation = () => {
+      if (!rotationForm.date || !rotationForm.serviceType || !rotationForm.volunteers) {
+        alert('Please fill in all fields');
+        return;
+      }
+
+      if (editingRotation) {
+        setServiceRotations(
+          serviceRotations.map(r =>
+            r.id === editingRotation.id
+              ? { ...r, ...rotationForm }
+              : r
+          )
+        );
+      } else {
+        const newRotation = {
+          id: Date.now(),
+          ...rotationForm,
+        };
+        setServiceRotations([...serviceRotations, newRotation]);
+      }
+      closeRotationModal();
+    };
+
+    const deleteRotation = (id) => {
+      if (confirm('Are you sure you want to delete this rotation?')) {
+        setServiceRotations(serviceRotations.filter(r => r.id !== id));
+      }
+    };
+
+    const sortedRotations = [...serviceRotations].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <h1>Service Rotations</h1>
+          <button className="btn-primary" onClick={() => openRotationModal()}>
+            <Plus size={18} /> Add Rotation
+          </button>
         </div>
+
         <div className="rotation-list">
-          <div className="rotation-item">
-            <div className="rotation-date">
-              <div className="date-day">04</div>
-              <div className="date-month">Oct</div>
+          {sortedRotations.length === 0 ? (
+            <div className="empty-state">
+              <Calendar size={48} />
+              <p>No service rotations scheduled yet</p>
+              <button className="btn-primary" onClick={() => openRotationModal()}>
+                <Plus size={18} /> Schedule First Rotation
+              </button>
             </div>
-            <div className="rotation-details">
-              <h4>Altar Service</h4>
-              <p>Elijah Benjamin, Martin Kusto, Alexandra Gerges</p>
-            </div>
-          </div>
-          <div className="rotation-item">
-            <div className="rotation-date">
-              <div className="date-day">11</div>
-              <div className="date-month">Oct</div>
-            </div>
-            <div className="rotation-details">
-              <h4>Ushers</h4>
-              <p>Sandra Shonoda, Fady Said</p>
-            </div>
-          </div>
+          ) : (
+            sortedRotations.map(rotation => {
+              const rotationDate = new Date(rotation.date);
+              return (
+                <div key={rotation.id} className="rotation-item">
+                  <div className="rotation-date">
+                    <div className="date-day">{rotationDate.getDate().toString().padStart(2, '0')}</div>
+                    <div className="date-month">{rotationDate.toLocaleDateString('en-US', { month: 'short' })}</div>
+                  </div>
+                  <div className="rotation-details">
+                    <h4>{rotation.serviceType}</h4>
+                    <p>{rotation.volunteers}</p>
+                  </div>
+                  <div className="rotation-actions">
+                    <button className="icon-btn" onClick={() => openRotationModal(rotation)}>
+                      <Edit2 size={16} />
+                    </button>
+                    <button className="icon-btn danger" onClick={() => deleteRotation(rotation.id)}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
+
+        {showRotationModal && (
+          <div className="modal-overlay" onClick={closeRotationModal}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>{editingRotation ? 'Edit Rotation' : 'Add Service Rotation'}</h2>
+                <button className="close-btn" onClick={closeRotationModal}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Date</label>
+                  <input
+                    type="date"
+                    value={rotationForm.date}
+                    onChange={(e) => setRotationForm({ ...rotationForm, date: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Service Type</label>
+                  <select
+                    value={rotationForm.serviceType}
+                    onChange={(e) => setRotationForm({ ...rotationForm, serviceType: e.target.value })}
+                  >
+                    <option value="">Select service type...</option>
+                    {serviceTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Volunteers (comma-separated names)</label>
+                  <textarea
+                    rows="3"
+                    value={rotationForm.volunteers}
+                    onChange={(e) => setRotationForm({ ...rotationForm, volunteers: e.target.value })}
+                    placeholder="e.g., Elijah Benjamin, Martin Kusto, Alexandra Gerges"
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button className="btn-secondary" onClick={closeRotationModal}>Cancel</button>
+                <button className="btn-primary" onClick={saveRotation}>
+                  <Save size={18} /> Save Rotation
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // Component: Visitations
-  const VisitationsView = () => (
-    <div className="content-section">
-      <div className="section-header">
-        <h1>Visitations</h1>
-        <button className="btn-primary">
-          <Plus size={18} /> Schedule Visit
-        </button>
-      </div>
+  const VisitationsView = () => {
+    const [showVisitModal, setShowVisitModal] = useState(false);
+    const [editingVisit, setEditingVisit] = useState(null);
+    const [visitForm, setVisitForm] = useState({
+      studentId: '',
+      date: '',
+      servants: '',
+      groupSize: '',
+      notes: '',
+      completed: false,
+    });
+    const [filterStatus, setFilterStatus] = useState('all');
 
-      <div className="visitations-grid">
-        {students.slice(0, 6).map(student => (
-          <div key={student.id} className="visitation-card">
-            <div className="visitation-header">
-              <h3>{student.firstName} {student.lastName}</h3>
-              <span className="visit-status pending">Pending</span>
+    const openVisitModal = (visit = null) => {
+      if (visit) {
+        setEditingVisit(visit);
+        setVisitForm({
+          studentId: visit.studentId,
+          date: visit.date,
+          servants: visit.servants,
+          groupSize: visit.groupSize,
+          notes: visit.notes || '',
+          completed: visit.completed,
+        });
+      } else {
+        setEditingVisit(null);
+        setVisitForm({
+          studentId: '',
+          date: '',
+          servants: '',
+          groupSize: '',
+          notes: '',
+          completed: false,
+        });
+      }
+      setShowVisitModal(true);
+    };
+
+    const closeVisitModal = () => {
+      setShowVisitModal(false);
+      setEditingVisit(null);
+      setVisitForm({
+        studentId: '',
+        date: '',
+        servants: '',
+        groupSize: '',
+        notes: '',
+        completed: false,
+      });
+    };
+
+    const saveVisit = () => {
+      if (!visitForm.studentId || !visitForm.date || !visitForm.servants) {
+        alert('Please fill in required fields (Student, Date, Servants)');
+        return;
+      }
+
+      if (editingVisit) {
+        setVisitations(
+          visitations.map(v =>
+            v.id === editingVisit.id
+              ? { ...v, ...visitForm }
+              : v
+          )
+        );
+      } else {
+        const newVisit = {
+          id: Date.now(),
+          ...visitForm,
+        };
+        setVisitations([...visitations, newVisit]);
+      }
+      closeVisitModal();
+    };
+
+    const deleteVisit = (id) => {
+      if (confirm('Are you sure you want to delete this visitation?')) {
+        setVisitations(visitations.filter(v => v.id !== id));
+      }
+    };
+
+    const toggleVisitCompleted = (id) => {
+      setVisitations(
+        visitations.map(v =>
+          v.id === id ? { ...v, completed: !v.completed } : v
+        )
+      );
+    };
+
+    const filteredVisitations = visitations.filter(visit => {
+      if (filterStatus === 'all') return true;
+      if (filterStatus === 'pending') return !visit.completed;
+      if (filterStatus === 'completed') return visit.completed;
+      return true;
+    });
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <h1>Visitations</h1>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div className="filter-tabs">
+              <button
+                className={filterStatus === 'all' ? 'active' : ''}
+                onClick={() => setFilterStatus('all')}
+              >
+                All ({visitations.length})
+              </button>
+              <button
+                className={filterStatus === 'pending' ? 'active' : ''}
+                onClick={() => setFilterStatus('pending')}
+              >
+                Pending ({visitations.filter(v => !v.completed).length})
+              </button>
+              <button
+                className={filterStatus === 'completed' ? 'active' : ''}
+                onClick={() => setFilterStatus('completed')}
+              >
+                Completed ({visitations.filter(v => v.completed).length})
+              </button>
             </div>
-            <div className="visitation-details">
-              <div className="detail-row">
-                <MapPin size={14} />
-                <span>Address needed</span>
-              </div>
-              <div className="detail-row">
-                <Calendar size={14} />
-                <span>Not scheduled</span>
-              </div>
-            </div>
-            <button className="btn-outline">Schedule Visit</button>
+            <button className="btn-primary" onClick={() => openVisitModal()}>
+              <Plus size={18} /> Schedule Visit
+            </button>
           </div>
-        ))}
+        </div>
+
+        <div className="visitations-grid">
+          {filteredVisitations.length === 0 ? (
+            <div className="empty-state">
+              <MapPin size={48} />
+              <p>No visitations {filterStatus !== 'all' ? filterStatus : 'scheduled'} yet</p>
+              <button className="btn-primary" onClick={() => openVisitModal()}>
+                <Plus size={18} /> Schedule First Visit
+              </button>
+            </div>
+          ) : (
+            filteredVisitations.map(visit => {
+              const student = students.find(s => s.id === visit.studentId);
+              if (!student) return null;
+
+              return (
+                <div key={visit.id} className="visitation-card">
+                  <div className="visitation-header">
+                    <h3>{student.firstName} {student.lastName}</h3>
+                    <span className={`visit-status ${visit.completed ? 'completed' : 'pending'}`}>
+                      {visit.completed ? 'Completed' : 'Pending'}
+                    </span>
+                  </div>
+                  <div className="visitation-details">
+                    <div className="detail-row">
+                      <Calendar size={14} />
+                      <span>{new Date(visit.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                    </div>
+                    <div className="detail-row">
+                      <Users size={14} />
+                      <span>{visit.servants}</span>
+                    </div>
+                    {visit.groupSize && (
+                      <div className="detail-row">
+                        <UserCheck size={14} />
+                        <span>Group of {visit.groupSize}</span>
+                      </div>
+                    )}
+                    {student.address && (
+                      <div className="detail-row">
+                        <MapPin size={14} />
+                        <span>{student.address}, {student.city}</span>
+                      </div>
+                    )}
+                    {visit.notes && (
+                      <div className="visit-notes">
+                        <p>{visit.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="visitation-actions">
+                    <button
+                      className={`btn-outline ${visit.completed ? 'completed' : ''}`}
+                      onClick={() => toggleVisitCompleted(visit.id)}
+                    >
+                      <CheckSquare size={16} />
+                      {visit.completed ? 'Mark Pending' : 'Mark Complete'}
+                    </button>
+                    <button className="icon-btn" onClick={() => openVisitModal(visit)}>
+                      <Edit2 size={16} />
+                    </button>
+                    <button className="icon-btn danger" onClick={() => deleteVisit(visit.id)}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {showVisitModal && (
+          <div className="modal-overlay" onClick={closeVisitModal}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>{editingVisit ? 'Edit Visitation' : 'Schedule Visitation'}</h2>
+                <button className="close-btn" onClick={closeVisitModal}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Student *</label>
+                  <select
+                    value={visitForm.studentId}
+                    onChange={(e) => setVisitForm({ ...visitForm, studentId: parseInt(e.target.value) })}
+                  >
+                    <option value="">Select a student...</option>
+                    {students.filter(s => s.status === 'Active').map(student => (
+                      <option key={student.id} value={student.id}>
+                        {student.firstName} {student.lastName} ({student.grade})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Visit Date *</label>
+                  <input
+                    type="date"
+                    value={visitForm.date}
+                    onChange={(e) => setVisitForm({ ...visitForm, date: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Servants Assigned *</label>
+                  <input
+                    type="text"
+                    value={visitForm.servants}
+                    onChange={(e) => setVisitForm({ ...visitForm, servants: e.target.value })}
+                    placeholder="e.g., Mariam, Peter"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Group Size</label>
+                  <input
+                    type="number"
+                    value={visitForm.groupSize}
+                    onChange={(e) => setVisitForm({ ...visitForm, groupSize: e.target.value })}
+                    placeholder="Number of people in visitation group"
+                    min="1"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Notes</label>
+                  <textarea
+                    rows="3"
+                    value={visitForm.notes}
+                    onChange={(e) => setVisitForm({ ...visitForm, notes: e.target.value })}
+                    placeholder="Additional notes about the visit..."
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={visitForm.completed}
+                      onChange={(e) => setVisitForm({ ...visitForm, completed: e.target.checked })}
+                    />
+                    Mark as completed
+                  </label>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button className="btn-secondary" onClick={closeVisitModal}>Cancel</button>
+                <button className="btn-primary" onClick={saveVisit}>
+                  <Save size={18} /> Save Visitation
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Component: Student Detail View
+  const StudentDetail = () => {
+    if (!selectedStudent) return null;
+
+    const studentAttendance = attendance.filter(a => a.studentId === selectedStudent.id);
+    const studentCourseProgress = courseProgress.filter(cp => cp.studentId === selectedStudent.id);
+
+    const attendancePercentage = studentAttendance.length > 0
+      ? Math.round((studentAttendance.filter(a => a.present).length / studentAttendance.length) * 100)
+      : 0;
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <button className="btn-outline" onClick={() => setCurrentView('students')}>
+            ← Back to Students
+          </button>
+          <button className="btn-primary" onClick={() => setShowModal(true)}>
+            <Edit2 size={18} /> Edit Student
+          </button>
+        </div>
+
+        <div className="student-detail-container">
+          {/* Student Profile Card */}
+          <div className="detail-card">
+            <div className="detail-header">
+              <div className="student-avatar" style={{ width: '80px', height: '80px', fontSize: '2rem' }}>
+                {selectedStudent.firstName[0]}{selectedStudent.lastName[0]}
+              </div>
+              <div>
+                <h1>{selectedStudent.firstName} {selectedStudent.lastName}</h1>
+                <span className={`status-badge status-${selectedStudent.status?.toLowerCase() || 'active'}`}>
+                  {selectedStudent.status || 'Active'}
+                </span>
+              </div>
+            </div>
+
+            <div className="detail-grid">
+              <div className="detail-item">
+                <label>Grade</label>
+                <p>{selectedStudent.grade}</p>
+              </div>
+              <div className="detail-item">
+                <label>Date of Birth</label>
+                <p>{selectedStudent.dob || 'Not provided'}</p>
+              </div>
+              <div className="detail-item">
+                <label>Phone</label>
+                <p>{selectedStudent.phone || 'Not provided'}</p>
+              </div>
+              <div className="detail-item">
+                <label>Email</label>
+                <p>{selectedStudent.email || 'Not provided'}</p>
+              </div>
+              <div className="detail-item">
+                <label>Responsible Servant</label>
+                <p>{selectedStudent.responsibleServant || 'Not assigned'}</p>
+              </div>
+              <div className="detail-item">
+                <label>Attendance Rate</label>
+                <p style={{ color: attendancePercentage >= 75 ? 'var(--success)' : 'var(--warning)' }}>
+                  {attendancePercentage}%
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Parent Information */}
+          {(selectedStudent.parent1Name || selectedStudent.parent2Name) && (
+            <div className="detail-card">
+              <h2>Parent Information</h2>
+              <div className="parents-grid">
+                {selectedStudent.parent1Name && (
+                  <div className="parent-card">
+                    <h3>Parent 1</h3>
+                    <div className="detail-item">
+                      <label>Name</label>
+                      <p>{selectedStudent.parent1Name}</p>
+                    </div>
+                    {selectedStudent.parent1Phone && (
+                      <div className="detail-item">
+                        <label>Phone</label>
+                        <p>{selectedStudent.parent1Phone}</p>
+                      </div>
+                    )}
+                    {selectedStudent.parent1Email && (
+                      <div className="detail-item">
+                        <label>Email</label>
+                        <p>{selectedStudent.parent1Email}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {selectedStudent.parent2Name && (
+                  <div className="parent-card">
+                    <h3>Parent 2</h3>
+                    <div className="detail-item">
+                      <label>Name</label>
+                      <p>{selectedStudent.parent2Name}</p>
+                    </div>
+                    {selectedStudent.parent2Phone && (
+                      <div className="detail-item">
+                        <label>Phone</label>
+                        <p>{selectedStudent.parent2Phone}</p>
+                      </div>
+                    )}
+                    {selectedStudent.parent2Email && (
+                      <div className="detail-item">
+                        <label>Email</label>
+                        <p>{selectedStudent.parent2Email}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Address Information */}
+          {selectedStudent.address && (
+            <div className="detail-card">
+              <h2>Address</h2>
+              <div className="detail-grid">
+                <div className="detail-item">
+                  <label>Street Address</label>
+                  <p>{selectedStudent.address}</p>
+                </div>
+                <div className="detail-item">
+                  <label>City</label>
+                  <p>{selectedStudent.city || 'Not provided'}</p>
+                </div>
+                <div className="detail-item">
+                  <label>Zipcode</label>
+                  <p>{selectedStudent.zipcode || 'Not provided'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Attendance History */}
+          <div className="detail-card">
+            <h2>Attendance History</h2>
+            {studentAttendance.length > 0 ? (
+              <div className="attendance-history">
+                {studentAttendance.slice(-10).reverse().map(record => (
+                  <div key={record.id} className="attendance-record">
+                    <span className="record-date">{record.date} ({record.day})</span>
+                    <span className={`record-status ${record.present ? 'present' : 'absent'}`}>
+                      {record.present ? '✓ Present' : '✗ Absent'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--text-secondary)' }}>No attendance records yet</p>
+            )}
+          </div>
+
+          {/* Course Progress */}
+          <div className="detail-card">
+            <h2>Servants Preparation Progress</h2>
+            {studentCourseProgress.length > 0 ? (
+              <div className="course-progress-grid">
+                {initialCourses.map(course => {
+                  const progress = studentCourseProgress.find(cp => cp.courseId === course.id);
+                  return (
+                    <div key={course.id} className="course-progress-item">
+                      <div className="course-name">{course.name}</div>
+                      <span className={`course-status-badge status-${progress?.status || 'not-started'}`}>
+                        {progress?.status ? progress.status.replace('-', ' ') : 'Not Started'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--text-secondary)' }}>
+                No course progress tracked yet. Visit{' '}
+                <button
+                  onClick={() => setCurrentView('servantsPrep')}
+                  style={{ color: 'var(--primary)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  Servants Prep
+                </button>
+                {' '}to start tracking.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Component: Data Import/Export
+  const DataImportView = () => {
+    const [importStep, setImportStep] = useState('upload'); // upload, preview, confirm
+    const [importType, setImportType] = useState('students');
+    const [csvFile, setCsvFile] = useState(null);
+    const [parsedData, setParsedData] = useState([]);
+    const [importErrors, setImportErrors] = useState([]);
+
+    const handleFileSelect = (e) => {
+      const file = e.target.files[0];
+      if (file && file.type === 'text/csv') {
+        setCsvFile(file);
+        parseCSV(file);
+      } else {
+        alert('Please select a valid CSV file');
+      }
+    };
+
+    const parseCSV = (file) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          setParsedData(results.data);
+          validateData(results.data);
+          setImportStep('preview');
+        },
+        error: (error) => {
+          alert('Error parsing CSV: ' + error.message);
+        }
+      });
+    };
+
+    const validateData = (data) => {
+      const errors = [];
+
+      if (importType === 'students') {
+        data.forEach((row, index) => {
+          if (!row.firstName || !row.lastName) {
+            errors.push(`Row ${index + 1}: Missing firstName or lastName`);
+          }
+          if (!row.grade || !['9th', '10th', '11th', '12th'].includes(row.grade)) {
+            errors.push(`Row ${index + 1}: Invalid grade (must be 9th, 10th, 11th, or 12th)`);
+          }
+        });
+      }
+
+      setImportErrors(errors);
+    };
+
+    const executeImport = () => {
+      if (importErrors.length > 0) {
+        if (!confirm('There are validation errors. Continue anyway?')) {
+          return;
+        }
+      }
+
+      if (importType === 'students') {
+        const newStudents = parsedData.map((row, index) => ({
+          id: Date.now() + index,
+          firstName: row.firstName || '',
+          lastName: row.lastName || '',
+          grade: row.grade || '9th',
+          phone: row.phone || '',
+          email: row.email || '',
+          dob: row.dob || '',
+          responsibleServant: row.responsibleServant || '',
+          status: row.status || 'Active',
+          parent1Name: row.parent1Name || '',
+          parent1Phone: row.parent1Phone || '',
+          parent1Email: row.parent1Email || '',
+          parent2Name: row.parent2Name || '',
+          parent2Phone: row.parent2Phone || '',
+          parent2Email: row.parent2Email || '',
+          address: row.address || '',
+          city: row.city || '',
+          zipcode: row.zipcode || '',
+        }));
+
+        setStudents([...students, ...newStudents]);
+        alert(`Successfully imported ${newStudents.length} students!`);
+      }
+
+      resetImport();
+      setCurrentView('students');
+    };
+
+    const resetImport = () => {
+      setImportStep('upload');
+      setCsvFile(null);
+      setParsedData([]);
+      setImportErrors([]);
+    };
+
+    const exportData = (dataType) => {
+      let data, filename;
+
+      if (dataType === 'students') {
+        data = students;
+        filename = 'students_export.csv';
+      } else if (dataType === 'attendance') {
+        const attendanceExport = attendance.map(a => {
+          const student = students.find(s => s.id === a.studentId);
+          return {
+            date: a.date,
+            day: a.day,
+            studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown',
+            present: a.present ? 'Yes' : 'No'
+          };
+        });
+        data = attendanceExport;
+        filename = 'attendance_export.csv';
+      } else if (dataType === 'courseProgress') {
+        const progressExport = courseProgress.map(cp => {
+          const student = students.find(s => s.id === cp.studentId);
+          const course = initialCourses.find(c => c.id === cp.courseId);
+          return {
+            studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown',
+            courseName: course ? course.name : 'Unknown',
+            status: cp.status
+          };
+        });
+        data = progressExport;
+        filename = 'course_progress_export.csv';
+      } else if (dataType === 'all') {
+        const allData = {
+          students,
+          attendance,
+          courseProgress,
+          serviceRotations,
+          visitations
+        };
+        const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'all_data_backup.json';
+        link.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      const csv = Papa.unparse(data);
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    };
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <h1>Data Import & Export</h1>
+        </div>
+
+        <div className="import-export-container">
+          {/* Export Section */}
+          <div className="import-export-card">
+            <div className="card-icon">
+              <FileDown size={32} />
+            </div>
+            <h2>Export Data</h2>
+            <p>Download your data as CSV or JSON backup</p>
+            <div className="export-buttons">
+              <button className="btn-outline" onClick={() => exportData('students')}>
+                <Download size={16} />
+                Export Students (CSV)
+              </button>
+              <button className="btn-outline" onClick={() => exportData('attendance')}>
+                <Download size={16} />
+                Export Attendance (CSV)
+              </button>
+              <button className="btn-outline" onClick={() => exportData('courseProgress')}>
+                <Download size={16} />
+                Export Course Progress (CSV)
+              </button>
+              <button className="btn-primary" onClick={() => exportData('all')}>
+                <Download size={16} />
+                Full Backup (JSON)
+              </button>
+            </div>
+          </div>
+
+          {/* Import Section */}
+          <div className="import-export-card">
+            <div className="card-icon">
+              <FileUp size={32} />
+            </div>
+            <h2>Import Data</h2>
+            <p>Upload CSV files to import student data</p>
+
+            {importStep === 'upload' && (
+              <div className="import-upload">
+                <div className="form-group">
+                  <label>Import Type</label>
+                  <select value={importType} onChange={(e) => setImportType(e.target.value)}>
+                    <option value="students">Students</option>
+                  </select>
+                </div>
+
+                <div className="file-upload-area">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    id="csv-upload"
+                    style={{ display: 'none' }}
+                  />
+                  <label htmlFor="csv-upload" className="file-upload-label">
+                    <Upload size={48} />
+                    <p>Click to select CSV file</p>
+                    <span>or drag and drop</span>
+                  </label>
+                </div>
+
+                <div className="import-help">
+                  <AlertCircle size={16} />
+                  <div>
+                    <strong>CSV Format Requirements:</strong>
+                    <ul>
+                      <li>Required: firstName, lastName, grade</li>
+                      <li>Optional: phone, email, dob, responsibleServant, status, parent info, address</li>
+                      <li>Grade must be: 9th, 10th, 11th, or 12th</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {importStep === 'preview' && (
+              <div className="import-preview">
+                <h3>Import Preview</h3>
+                <p>Found {parsedData.length} records</p>
+
+                {importErrors.length > 0 && (
+                  <div className="import-errors">
+                    <AlertCircle size={16} />
+                    <div>
+                      <strong>{importErrors.length} validation errors:</strong>
+                      <ul>
+                        {importErrors.slice(0, 5).map((error, i) => (
+                          <li key={i}>{error}</li>
+                        ))}
+                        {importErrors.length > 5 && <li>...and {importErrors.length - 5} more</li>}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                <div className="preview-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>First Name</th>
+                        <th>Last Name</th>
+                        <th>Grade</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedData.slice(0, 10).map((row, i) => (
+                        <tr key={i}>
+                          <td>{row.firstName}</td>
+                          <td>{row.lastName}</td>
+                          <td>{row.grade}</td>
+                          <td>{row.phone}</td>
+                          <td>{row.status || 'Active'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {parsedData.length > 10 && (
+                    <p style={{ marginTop: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      Showing 10 of {parsedData.length} records
+                    </p>
+                  )}
+                </div>
+
+                <div className="import-actions">
+                  <button className="btn-secondary" onClick={resetImport}>Cancel</button>
+                  <button className="btn-primary" onClick={executeImport}>
+                    <Upload size={16} />
+                    Import {parsedData.length} Students
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Component: Student Modal
   const StudentModal = () => {
@@ -892,6 +2031,14 @@ const YouthMinistryApp = () => {
             <MapPin size={20} />
             <span>Visitations</span>
           </button>
+
+          <button
+            className={`nav-item ${currentView === 'import' ? 'active' : ''}`}
+            onClick={() => setCurrentView('import')}
+          >
+            <Upload size={20} />
+            <span>Import/Export</span>
+          </button>
         </nav>
 
         <div className="sidebar-footer">
@@ -927,10 +2074,12 @@ const YouthMinistryApp = () => {
         <div className="content-wrapper">
           {currentView === 'dashboard' && <Dashboard />}
           {currentView === 'students' && <StudentsView />}
+          {currentView === 'studentDetail' && <StudentDetail />}
           {currentView === 'attendance' && <AttendanceView />}
           {currentView === 'servantsPrep' && <ServantsPrep />}
           {currentView === 'rotations' && <ServiceRotationsView />}
           {currentView === 'visitations' && <VisitationsView />}
+          {currentView === 'import' && <DataImportView />}
         </div>
       </main>
 

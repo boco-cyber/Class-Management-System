@@ -259,6 +259,16 @@
           font-family: 'Crimson Pro', serif;
         }
 
+        .stat-detail {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          margin-top: 0.25rem;
+        }
+
+        .stat-detail span {
+          margin-right: 0.5rem;
+        }
+
         .dashboard-section {
           grid-column: 1 / -1;
           background: var(--bg-paper);
@@ -301,6 +311,26 @@
           margin-left: auto;
           font-size: 0.875rem;
           color: var(--text-secondary);
+        }
+
+        .empty-activity {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 3rem 2rem;
+          color: var(--text-secondary);
+          text-align: center;
+        }
+
+        .empty-activity svg {
+          opacity: 0.3;
+          margin-bottom: 1rem;
+        }
+
+        .empty-activity p {
+          margin: 0;
+          font-size: 0.9375rem;
         }
 
         .action-buttons {
@@ -885,9 +915,19 @@
           color: var(--text-primary);
         }
 
+        .rotation-details {
+          flex: 1;
+        }
+
         .rotation-details p {
           color: var(--text-secondary);
           font-size: 0.9375rem;
+        }
+
+        .rotation-actions {
+          display: flex;
+          gap: 0.5rem;
+          align-items: center;
         }
 
         .visitation-card {
@@ -940,6 +980,267 @@
 
         .visitation-details {
           margin-bottom: 1.25rem;
+        }
+
+        .visitation-actions {
+          display: flex;
+          gap: 0.5rem;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .visit-notes {
+          margin-top: 1rem;
+          padding: 0.75rem;
+          background: var(--bg-light);
+          border-radius: 6px;
+          border-left: 3px solid var(--primary);
+        }
+
+        .visit-notes p {
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+          line-height: 1.5;
+          margin: 0;
+        }
+
+        /* Filter Tabs */
+        .filter-tabs {
+          display: flex;
+          gap: 0.5rem;
+          padding: 0.25rem;
+          background: var(--card-bg);
+          border-radius: 8px;
+          border: 1px solid var(--border);
+        }
+
+        .filter-tabs button {
+          padding: 0.5rem 1rem;
+          border: none;
+          background: transparent;
+          color: var(--text-secondary);
+          font-size: 0.875rem;
+          font-weight: 500;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .filter-tabs button:hover {
+          background: var(--bg-light);
+          color: var(--text-primary);
+        }
+
+        .filter-tabs button.active {
+          background: var(--primary);
+          color: white;
+        }
+
+        /* Import/Export */
+        .import-export-container {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 2rem;
+          padding: 1rem 0;
+        }
+
+        .import-export-card {
+          background: var(--card-bg);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 2rem;
+          text-align: center;
+        }
+
+        .card-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 64px;
+          height: 64px;
+          background: var(--bg-light);
+          border-radius: 50%;
+          color: var(--primary);
+          margin-bottom: 1.5rem;
+        }
+
+        .import-export-card h2 {
+          margin: 0 0 0.5rem 0;
+          font-size: 1.5rem;
+          color: var(--text-primary);
+        }
+
+        .import-export-card p {
+          margin: 0 0 2rem 0;
+          color: var(--text-secondary);
+        }
+
+        .export-buttons {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+
+        .file-upload-area {
+          margin: 1.5rem 0;
+          border: 2px dashed var(--border);
+          border-radius: 8px;
+          padding: 3rem 2rem;
+          background: var(--bg-light);
+          transition: all 0.2s ease;
+          cursor: pointer;
+        }
+
+        .file-upload-area:hover {
+          border-color: var(--primary);
+          background: white;
+        }
+
+        .file-upload-label {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
+          cursor: pointer;
+          color: var(--text-secondary);
+        }
+
+        .file-upload-label p {
+          margin: 0;
+          font-size: 1rem;
+          font-weight: 500;
+          color: var(--text-primary);
+        }
+
+        .file-upload-label span {
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+        }
+
+        .import-help {
+          display: flex;
+          gap: 1rem;
+          padding: 1rem;
+          background: #E3F2FD;
+          border-radius: 8px;
+          border-left: 3px solid #2196F3;
+          text-align: left;
+          margin-top: 1.5rem;
+        }
+
+        .import-help svg {
+          flex-shrink: 0;
+          color: #2196F3;
+          margin-top: 0.25rem;
+        }
+
+        .import-help strong {
+          display: block;
+          margin-bottom: 0.5rem;
+          color: var(--text-primary);
+        }
+
+        .import-help ul {
+          margin: 0;
+          padding-left: 1.5rem;
+          color: var(--text-secondary);
+        }
+
+        .import-help li {
+          margin: 0.25rem 0;
+        }
+
+        .import-preview {
+          text-align: left;
+        }
+
+        .import-preview h3 {
+          margin: 0 0 0.5rem 0;
+          font-size: 1.25rem;
+          color: var(--text-primary);
+        }
+
+        .import-preview > p {
+          margin: 0 0 1.5rem 0;
+          color: var(--text-secondary);
+        }
+
+        .import-errors {
+          display: flex;
+          gap: 1rem;
+          padding: 1rem;
+          background: #FFEBEE;
+          border-radius: 8px;
+          border-left: 3px solid var(--danger);
+          margin-bottom: 1.5rem;
+        }
+
+        .import-errors svg {
+          flex-shrink: 0;
+          color: var(--danger);
+          margin-top: 0.25rem;
+        }
+
+        .import-errors strong {
+          display: block;
+          margin-bottom: 0.5rem;
+          color: var(--danger);
+        }
+
+        .import-errors ul {
+          margin: 0;
+          padding-left: 1.5rem;
+          color: #C62828;
+        }
+
+        .import-errors li {
+          margin: 0.25rem 0;
+        }
+
+        .preview-table {
+          margin: 1.5rem 0;
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
+        .preview-table table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .preview-table th {
+          background: var(--bg-light);
+          padding: 0.75rem 1rem;
+          text-align: left;
+          font-weight: 600;
+          color: var(--text-primary);
+          border-bottom: 2px solid var(--border);
+        }
+
+        .preview-table td {
+          padding: 0.75rem 1rem;
+          border-bottom: 1px solid var(--border);
+          color: var(--text-secondary);
+        }
+
+        .preview-table tbody tr:last-child td {
+          border-bottom: none;
+        }
+
+        .preview-table tbody tr:hover {
+          background: var(--bg-light);
+        }
+
+        .import-actions {
+          display: flex;
+          gap: 1rem;
+          justify-content: flex-end;
+          margin-top: 2rem;
+        }
+
+        .import-upload {
+          text-align: left;
         }
 
         /* Modal */
@@ -1145,3 +1446,312 @@
           background: #F5F5F5;
           color: #757575;
         }
+
+        /* Student Detail View */
+        .student-detail-container {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+
+        .detail-card {
+          background: var(--bg-paper);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 2rem;
+          box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .detail-card h2 {
+          font-family: 'Crimson Pro', serif;
+          font-size: 1.5rem;
+          font-weight: 700;
+          margin-bottom: 1.5rem;
+          color: var(--text-primary);
+        }
+
+        .detail-header {
+          display: flex;
+          align-items: center;
+          gap: 1.5rem;
+          margin-bottom: 2rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 2px solid var(--border);
+        }
+
+        .detail-header h1 {
+          font-family: 'Crimson Pro', serif;
+          font-size: 2rem;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        }
+
+        .detail-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1.5rem;
+        }
+
+        .detail-item label {
+          display: block;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: var(--text-secondary);
+          margin-bottom: 0.5rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .detail-item p {
+          font-size: 1rem;
+          color: var(--text-primary);
+          font-weight: 500;
+        }
+
+        .parents-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 1.5rem;
+        }
+
+        .parent-card {
+          background: var(--bg-light);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 1.5rem;
+        }
+
+        .parent-card h3 {
+          font-size: 1.125rem;
+          font-weight: 700;
+          margin-bottom: 1rem;
+          color: var(--primary);
+        }
+
+        .attendance-history {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+
+        .attendance-record {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.875rem 1rem;
+          background: var(--bg-light);
+          border-radius: 8px;
+          border: 1px solid var(--border);
+        }
+
+        .record-date {
+          font-weight: 500;
+          color: var(--text-primary);
+        }
+
+        .record-status {
+          padding: 0.25rem 0.75rem;
+          border-radius: 12px;
+          font-size: 0.875rem;
+          font-weight: 600;
+        }
+
+        .record-status.present {
+          background: #E8F5E9;
+          color: var(--success);
+        }
+
+        .record-status.absent {
+          background: #FFEBEE;
+          color: var(--danger);
+        }
+
+        .course-progress-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+          gap: 1rem;
+        }
+
+        .course-progress-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.875rem 1rem;
+          background: var(--bg-light);
+          border-radius: 8px;
+          border: 1px solid var(--border);
+        }
+
+        .course-name {
+          font-weight: 600;
+          color: var(--text-primary);
+        }
+
+        .course-status-badge {
+          padding: 0.25rem 0.625rem;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          text-transform: capitalize;
+        }
+
+        .course-status-badge.status-not-started {
+          background: #F5F5F5;
+          color: #757575;
+        }
+
+        .course-status-badge.status-in-progress {
+          background: #E3F2FD;
+          color: #1976D2;
+        }
+
+        .course-status-badge.status-completed {
+          background: #FFF4E6;
+          color: var(--warning);
+        }
+
+        .course-status-badge.status-passed {
+          background: #E8F5E9;
+          color: var(--success);
+        }
+
+/* Bulk Actions */
+.bulk-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--card-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.bulk-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.bulk-btn:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(101, 67, 33, 0.2);
+}
+
+.bulk-btn:active {
+  transform: translateY(0);
+}
+
+/* Attendance History */
+.attendance-history-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.attendance-history-section h2 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.history-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.history-stat-card {
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.history-stat-card .stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 0.25rem;
+}
+
+.history-stat-card .stat-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.history-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.history-session {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.history-session:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(101, 67, 33, 0.1);
+}
+
+.session-date {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.session-date svg {
+  color: var(--primary);
+}
+
+.session-stats {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.session-count {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.875rem;
+}
+
+.present-count {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.absent-count {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.session-percentage {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
