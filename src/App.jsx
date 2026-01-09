@@ -1,14 +1,132 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Users, BookOpen, CheckSquare, MapPin, UserCheck, Settings, Home, Bell, Search, Download, Upload, Plus, Edit2, Trash2, Eye, Filter, X, Save, ChevronDown, ChevronRight, Clock, Mail, Phone, Award, Activity } from 'lucide-react';
 import './App.css';
 
+// Custom hook for localStorage persistence
+function useLocalStorage(key, initialValue) {
+  const [value, setValue] = useState(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : initialValue;
+    } catch (error) {
+      console.error(`Error loading ${key} from localStorage:`, error);
+      return initialValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error saving ${key} to localStorage:`, error);
+    }
+  }, [key, value]);
+
+  return [value, setValue];
+}
+
 // Initial data structure based on the Excel file
 const initialStudents = [
-  { id: 1, firstName: 'Abanob', lastName: 'Bakheet', grade: '9th', phone: '951-429-2464', email: '', dob: '2010-08-05', responsibleServant: 'Mariam', status: 'Active' },
-  { id: 2, firstName: 'Abigail', lastName: 'Malak', grade: '10th', phone: '', email: '', dob: '', responsibleServant: 'Mariam', status: 'Active' },
-  { id: 3, firstName: 'Alexandra', lastName: 'Gerges', grade: '11th', phone: '', email: '', dob: '2008-08-22', responsibleServant: 'Mariam', status: 'Active' },
-  { id: 4, firstName: 'Andrew', lastName: 'Nabil', grade: '12th', phone: '', email: '', dob: '2009-07-28', responsibleServant: 'Nancy', status: 'Active' },
-  { id: 5, firstName: 'Angela', lastName: 'Moawad', grade: '9th', phone: '', email: '', dob: '2008-09-22', responsibleServant: 'Veronia', status: 'Active' },
+  {
+    id: 1,
+    firstName: 'Abanob',
+    lastName: 'Bakheet',
+    grade: '9th',
+    phone: '951-429-2464',
+    email: '',
+    dob: '2010-08-05',
+    responsibleServant: 'Mariam',
+    status: 'Active',
+    parent1Name: '',
+    parent1Phone: '',
+    parent1Email: '',
+    parent2Name: '',
+    parent2Phone: '',
+    parent2Email: '',
+    address: '',
+    city: '',
+    zipcode: ''
+  },
+  {
+    id: 2,
+    firstName: 'Abigail',
+    lastName: 'Malak',
+    grade: '10th',
+    phone: '',
+    email: '',
+    dob: '',
+    responsibleServant: 'Mariam',
+    status: 'Active',
+    parent1Name: '',
+    parent1Phone: '',
+    parent1Email: '',
+    parent2Name: '',
+    parent2Phone: '',
+    parent2Email: '',
+    address: '',
+    city: '',
+    zipcode: ''
+  },
+  {
+    id: 3,
+    firstName: 'Alexandra',
+    lastName: 'Gerges',
+    grade: '11th',
+    phone: '',
+    email: '',
+    dob: '2008-08-22',
+    responsibleServant: 'Mariam',
+    status: 'Active',
+    parent1Name: '',
+    parent1Phone: '',
+    parent1Email: '',
+    parent2Name: '',
+    parent2Phone: '',
+    parent2Email: '',
+    address: '',
+    city: '',
+    zipcode: ''
+  },
+  {
+    id: 4,
+    firstName: 'Andrew',
+    lastName: 'Nabil',
+    grade: '12th',
+    phone: '',
+    email: '',
+    dob: '2009-07-28',
+    responsibleServant: 'Nancy',
+    status: 'Active',
+    parent1Name: '',
+    parent1Phone: '',
+    parent1Email: '',
+    parent2Name: '',
+    parent2Phone: '',
+    parent2Email: '',
+    address: '',
+    city: '',
+    zipcode: ''
+  },
+  {
+    id: 5,
+    firstName: 'Angela',
+    lastName: 'Moawad',
+    grade: '9th',
+    phone: '',
+    email: '',
+    dob: '2008-09-22',
+    responsibleServant: 'Veronia',
+    status: 'Active',
+    parent1Name: '',
+    parent1Phone: '',
+    parent1Email: '',
+    parent2Name: '',
+    parent2Phone: '',
+    parent2Email: '',
+    address: '',
+    city: '',
+    zipcode: ''
+  },
 ];
 
 const initialAttendance = [];
@@ -28,16 +146,17 @@ const initialCourses = [
 
 const YouthMinistryApp = () => {
   const [currentView, setCurrentView] = useState('dashboard');
-  const [students, setStudents] = useState(initialStudents);
-  const [attendance, setAttendance] = useState(initialAttendance);
+  const [students, setStudents] = useLocalStorage('yms_students', initialStudents);
+  const [attendance, setAttendance] = useLocalStorage('yms_attendance', initialAttendance);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGrade, setFilterGrade] = useState('all');
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [serviceRotations, setServiceRotations] = useState([]);
-  const [visitations, setVisitations] = useState([]);
-  const [teachingSchedule, setTeachingSchedule] = useState([]);
+  const [serviceRotations, setServiceRotations] = useLocalStorage('yms_serviceRotations', []);
+  const [visitations, setVisitations] = useLocalStorage('yms_visitations', []);
+  const [teachingSchedule, setTeachingSchedule] = useLocalStorage('yms_teachingSchedule', []);
+  const [courseProgress, setCourseProgress] = useLocalStorage('yms_courseProgress', []);
 
   // Calculate statistics
   const stats = {
@@ -202,11 +321,16 @@ const YouthMinistryApp = () => {
                 {student.firstName[0]}{student.lastName[0]}
               </div>
               <div className="student-info">
-                <h3>{student.firstName} {student.lastName}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3>{student.firstName} {student.lastName}</h3>
+                  <span className={`status-badge status-${student.status?.toLowerCase() || 'active'}`}>
+                    {student.status || 'Active'}
+                  </span>
+                </div>
                 <p className="student-grade">{student.grade}</p>
               </div>
             </div>
-            
+
             <div className="student-details">
               {student.phone && (
                 <div className="detail-row">
@@ -224,6 +348,18 @@ const YouthMinistryApp = () => {
                 <UserCheck size={14} />
                 <span>{student.responsibleServant}</span>
               </div>
+              {student.parent1Name && (
+                <div className="detail-row" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
+                  <Users size={14} />
+                  <span style={{ fontSize: '0.8rem' }}>{student.parent1Name}</span>
+                </div>
+              )}
+              {student.address && (
+                <div className="detail-row">
+                  <MapPin size={14} />
+                  <span style={{ fontSize: '0.8rem' }}>{student.city || student.address}</span>
+                </div>
+              )}
             </div>
             
             <div className="student-actions">
@@ -457,8 +593,23 @@ const YouthMinistryApp = () => {
   // Component: Student Modal
   const StudentModal = () => {
     const [formData, setFormData] = useState(selectedStudent || {
-      firstName: '', lastName: '', grade: '9th', phone: '', email: '', 
-      dob: '', responsibleServant: '', status: 'Active'
+      firstName: '',
+      lastName: '',
+      grade: '9th',
+      phone: '',
+      email: '',
+      dob: '',
+      responsibleServant: '',
+      status: 'Active',
+      parent1Name: '',
+      parent1Phone: '',
+      parent1Email: '',
+      parent2Name: '',
+      parent2Phone: '',
+      parent2Email: '',
+      address: '',
+      city: '',
+      zipcode: ''
     });
 
     const handleSubmit = (e) => {
@@ -545,20 +696,123 @@ const YouthMinistryApp = () => {
               </div>
             </div>
 
+            <div className="form-row">
+              <div className="form-group">
+                <label>Responsible Servant</label>
+                <select
+                  value={formData.responsibleServant}
+                  onChange={(e) => setFormData({...formData, responsibleServant: e.target.value})}
+                >
+                  <option value="">Select Servant</option>
+                  <option value="Veronia">Veronia</option>
+                  <option value="Magda">Magda</option>
+                  <option value="Kero">Kero Basely</option>
+                  <option value="Nancy">Nancy</option>
+                  <option value="Gerges">Gerges</option>
+                  <option value="Mariam">Mariam</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({...formData, status: e.target.value})}
+                >
+                  <option value="Active">Active</option>
+                  <option value="Graduate">Graduate</option>
+                  <option value="Transferred">Transferred</option>
+                </select>
+              </div>
+            </div>
+
+            <h3 style={{ marginTop: '1.5rem', marginBottom: '1rem', fontSize: '1.1rem', color: 'var(--primary)' }}>Parent 1 Information</h3>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Parent 1 Name</label>
+                <input
+                  type="text"
+                  value={formData.parent1Name}
+                  onChange={(e) => setFormData({...formData, parent1Name: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Parent 1 Phone</label>
+                <input
+                  type="tel"
+                  value={formData.parent1Phone}
+                  onChange={(e) => setFormData({...formData, parent1Phone: e.target.value})}
+                />
+              </div>
+            </div>
+
             <div className="form-group">
-              <label>Responsible Servant</label>
-              <select
-                value={formData.responsibleServant}
-                onChange={(e) => setFormData({...formData, responsibleServant: e.target.value})}
-              >
-                <option value="">Select Servant</option>
-                <option value="Veronia">Veronia</option>
-                <option value="Magda">Magda</option>
-                <option value="Kero">Kero Basely</option>
-                <option value="Nancy">Nancy</option>
-                <option value="Gerges">Gerges</option>
-                <option value="Mariam">Mariam</option>
-              </select>
+              <label>Parent 1 Email</label>
+              <input
+                type="email"
+                value={formData.parent1Email}
+                onChange={(e) => setFormData({...formData, parent1Email: e.target.value})}
+              />
+            </div>
+
+            <h3 style={{ marginTop: '1.5rem', marginBottom: '1rem', fontSize: '1.1rem', color: 'var(--primary)' }}>Parent 2 Information</h3>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Parent 2 Name</label>
+                <input
+                  type="text"
+                  value={formData.parent2Name}
+                  onChange={(e) => setFormData({...formData, parent2Name: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Parent 2 Phone</label>
+                <input
+                  type="tel"
+                  value={formData.parent2Phone}
+                  onChange={(e) => setFormData({...formData, parent2Phone: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Parent 2 Email</label>
+              <input
+                type="email"
+                value={formData.parent2Email}
+                onChange={(e) => setFormData({...formData, parent2Email: e.target.value})}
+              />
+            </div>
+
+            <h3 style={{ marginTop: '1.5rem', marginBottom: '1rem', fontSize: '1.1rem', color: 'var(--primary)' }}>Address Information</h3>
+
+            <div className="form-group">
+              <label>Address</label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => setFormData({...formData, address: e.target.value})}
+              />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>City</label>
+                <input
+                  type="text"
+                  value={formData.city}
+                  onChange={(e) => setFormData({...formData, city: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Zipcode</label>
+                <input
+                  type="text"
+                  value={formData.zipcode}
+                  onChange={(e) => setFormData({...formData, zipcode: e.target.value})}
+                />
+              </div>
             </div>
 
             <div className="modal-actions">
